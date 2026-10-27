@@ -56,6 +56,7 @@ const ObsPhotoSelectionList = ( {
   return (
     <FlatList
       data={photoUris}
+      keyExtractor={( uri, index ) => `${uri}-${index}`}
       renderItem={renderPhoto}
       horizontal
     />

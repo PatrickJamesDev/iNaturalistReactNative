@@ -1,8 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
 import { RealmContext } from "providers/contexts";
-import {
-  useCallback, useEffect, useMemo,
-} from "react";
+import { useCallback, useEffect } from "react";
 import { EventRegister } from "react-native-event-listeners";
 import Observation from "realmModels/Observation";
 import type { RealmObservation } from "realmModels/types";
@@ -51,8 +49,6 @@ export default ( canUpload: boolean ) => {
   const initialNumObservationsInQueue = useStore( state => state.initialNumObservationsInQueue );
   const stopAllUploads = useStore( state => state.stopAllUploads );
 
-  const unsyncedList = Observation.filterUnsyncedObservations( realm );
-  const unsyncedUuids = useMemo( ( ) => unsyncedList.map( o => o.uuid ), [unsyncedList] );
   const abortController = useStore( storeState => storeState.abortController );
 
   const { t } = useTranslation( );
@@ -146,10 +142,11 @@ export default ( canUpload: boolean ) => {
         // stopAllUploads already cleared the queue if the top level controller was aborted
         // so don't do it a second time if it was
         removeFromUploadQueue( );
-        if (
-          uploadQueue.length === 0
-          && !currentUpload
-        ) {
+        // Read the queue from the store instead of this render's closure: the
+        // queue is replaced immutably now, so the captured array still contains
+        // the upload we just removed and would never look empty.
+        const { uploadQueue: remainingQueue, currentUpload: activeUpload } = useStore.getState( );
+        if ( remainingQueue.length === 0 && !activeUpload ) {
           completeUploads( );
         }
       }
@@ -158,13 +155,11 @@ export default ( canUpload: boolean ) => {
     abortController,
     addUploadError,
     completeUploads,
-    currentUpload,
     realm,
     removeDeletedObsFromUploadQueue,
     removeFromUploadQueue,
     setCurrentUpload,
     t,
-    uploadQueue,
     navigation,
     stopAllUploads,
   ] );
@@ -200,8 +195,12 @@ export default ( canUpload: boolean ) => {
   ] );
 
   const createUploadQueueAllUnsynced = useCallback( ( skipSomeUuids: string[] | undefined ) => {
-    const uploadsUuids = unsyncedUuids
-      .filter( ( uuid: string ) => !skipSomeUuids?.includes( uuid ) );
+    // Query at press time. Doing this during every render made the whole MyObservations tree pay
+    // for a Realm scan whenever any unrelated subscribed value changed.
+    const skipped = new Set( skipSomeUuids ?? [] );
+    const uploadsUuids = Observation.filterUnsyncedObservations( realm )
+      .map( o => o.uuid )
+      .filter( ( uuid: string ) => !skipped.has( uuid ) );
     if ( uploadsUuids.length === 0 ) {
       return;
     }
@@ -223,7 +222,6 @@ export default ( canUpload: boolean ) => {
     setCannotUploadObservations,
     setStartUploadObservations,
     setTotalToolbarIncrements,
-    unsyncedUuids,
   ] );
 
   const startUploadObservations = useCallback( async ( skipSomeUuids: string[] | undefined ) => {

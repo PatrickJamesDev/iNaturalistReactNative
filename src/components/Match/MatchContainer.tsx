@@ -180,6 +180,14 @@ const MatchContainer = ( ) => {
      = onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_ONLINE_FETCHED
       || onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_ONLINE_ERROR;
 
+  // Read the current online status through a ref so these callbacks keep stable identities.
+  // They are effect dependencies in the suggestion hooks; recreating them whenever a status
+  // changes made those effects re-run, which repeated ML prediction and Realm taxon writes.
+  const onlineFetchStatusRef = useRef( onlineFetchStatus );
+  useEffect( ( ) => {
+    onlineFetchStatusRef.current = onlineFetchStatus;
+  }, [onlineFetchStatus] );
+
   const onFetchError = useCallback(
     ( { isOnline }: { isOnline: boolean } ) => {
       if ( isOnline ) {
@@ -193,7 +201,7 @@ const MatchContainer = ( ) => {
           offlineFetchStatus: FETCH_STATUSES.FETCH_STATUS_OFFLINE_ERROR,
         } );
         // If offline is finished, and online still in loading state it means it never started
-        if ( onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_LOADING ) {
+        if ( onlineFetchStatusRef.current === FETCH_STATUSES.FETCH_STATUS_LOADING ) {
           dispatch( {
             type: "SET_ONLINE_FETCH_STATUS",
             onlineFetchStatus: FETCH_STATUSES.FETCH_STATUS_ONLINE_SKIPPED,
@@ -201,7 +209,7 @@ const MatchContainer = ( ) => {
         }
       }
     },
-    [onlineFetchStatus],
+    [],
   );
 
   const onFetched = useCallback(
@@ -223,7 +231,7 @@ const MatchContainer = ( ) => {
           offlineFetchStatus: FETCH_STATUSES.FETCH_STATUS_OFFLINE_FETCHED,
         } );
         // If offline is finished, and online still in loading state it means it never started
-        if ( onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_LOADING ) {
+        if ( onlineFetchStatusRef.current === FETCH_STATUSES.FETCH_STATUS_LOADING ) {
           dispatch( {
             type: "SET_ONLINE_FETCH_STATUS",
             onlineFetchStatus: FETCH_STATUSES.FETCH_STATUS_ONLINE_SKIPPED,
@@ -231,7 +239,7 @@ const MatchContainer = ( ) => {
         }
       }
     },
-    [onlineFetchStatus],
+    [],
   );
 
   const {

@@ -7,7 +7,9 @@ import {
   useExplore,
 } from "providers/ExploreContext";
 import type { Node } from "react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback, useEffect, useMemo, useState,
+} from "react";
 import Taxon from "realmModels/Taxon";
 import {
   useCurrentUser,
@@ -113,16 +115,19 @@ const SpeciesView = ( {
     r => r.taxon.id,
   ) || [], [seenByCurrentUser?.results] );
 
-  useEffect( ( ) => {
-    if ( pageObservedTaxonIds.length > 0 ) {
-      pageObservedTaxonIds.forEach( id => {
-        observedTaxonIds.add( id );
-      } );
-      setObservedTaxonIds( observedTaxonIds );
-    }
-  }, [pageObservedTaxonIds, observedTaxonIds] );
+  useEffect( () => {
+    if ( pageObservedTaxonIds.length === 0 ) return;
+    setObservedTaxonIds( prev => {
+      if ( pageObservedTaxonIds.every( id => prev.has( id ) ) ) {
+        return prev;
+      }
+      const next = new Set( prev );
+      pageObservedTaxonIds.forEach( id => next.add( id ) );
+      return next;
+    } );
+  }, [pageObservedTaxonIds] );
 
-  const renderItem = ( { item } ) => {
+  const renderItem = useCallback( ( { item } ) => {
     const taxon = item?.taxon;
     const taxonId = taxon.id;
     // Add a unique key to ensure component recreation
@@ -138,7 +143,7 @@ const SpeciesView = ( {
         showSpeciesSeenCheckmark={observedTaxonIds.has( taxonId )}
       />
     );
-  };
+  }, [gridItemStyle, observedTaxonIds] );
 
   useEffect( ( ) => {
     handleUpdateCount( "species", totalResults );

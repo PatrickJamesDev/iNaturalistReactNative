@@ -1,8 +1,6 @@
 // @flow
 
-import {
-  useCallback, useMemo, useState,
-} from "react";
+import { useCallback, useState } from "react";
 
 const useExploreHeaderCount = ( ): Object => {
   const [count, setCount] = useState( {
@@ -13,29 +11,23 @@ const useExploreHeaderCount = ( ): Object => {
   } );
   const [isFetching, setIsFetching] = useState( false );
 
-  const updateCount = useCallback( newCount => {
-    setCount( {
-      ...count,
-      ...newCount,
-    } );
-    setIsFetching( false );
-  }, [count] );
-
-  const memoizedCount = useMemo( ( ) => count, [count] );
-
-  const handleUpdateCount = ( exploreView, totalResults ) => {
+  // Functional updates keep this callback stable, so the effects in the
+  // view components that receive handleUpdateCount don't re-run every time
+  // a count changes.
+  const handleUpdateCount = useCallback( ( exploreView, totalResults ) => {
     if ( totalResults === null ) {
       return;
     }
-    if ( count[exploreView] !== totalResults ) {
-      updateCount( { [exploreView]: totalResults } );
-    } else if ( count[exploreView] === totalResults && isFetching ) {
-      setIsFetching( false );
-    }
-  };
+    setCount( previousCount => (
+      previousCount[exploreView] === totalResults
+        ? previousCount
+        : { ...previousCount, [exploreView]: totalResults }
+    ) );
+    setIsFetching( false );
+  }, [] );
 
   return {
-    count: memoizedCount,
+    count,
     isFetching,
     handleUpdateCount,
     setIsFetching,

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import useTranslation from "sharedHooks/useTranslation";
 import type { SortDirection, SpeciesCount } from "types/sorting";
 
@@ -36,7 +37,7 @@ export const EXPLORE_SPECIES_SORT_OPTIONS: SPECIES_SORT[] = [
 
 export function useSpeciesSortLabels( ): Record<SPECIES_SORT, SpeciesSortLabels> {
   const { t } = useTranslation( );
-  return {
+  return useMemo( ( ) => ( {
     [SPECIES_SORT.COUNT_DESC]: {
       label: t( "Most-Observed-Default" ),
       text: t( "Species-with-the-most-observations-appear-first" ),
@@ -45,7 +46,7 @@ export function useSpeciesSortLabels( ): Record<SPECIES_SORT, SpeciesSortLabels>
       label: t( "Least-Observed" ),
       text: t( "Species-with-the-least-observations-appear-first" ),
     },
-  };
+  } ), [t] );
 }
 
 export function speciesSortToApiParams( sort: SPECIES_SORT ): SpeciesSortAPIParams {

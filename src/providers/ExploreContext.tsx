@@ -656,40 +656,45 @@ const ExploreProvider = ( { children }: ExploreProviderProps ) => {
 
   // To store a snapshot of the state, e.g when the user opens the filters modal
   const [snapshot, setSnapshot] = React.useState<State | undefined>( undefined );
-  const makeSnapshot = () => setSnapshot( state );
+  const makeSnapshot = React.useCallback( () => setSnapshot( state ), [state] );
 
   const differsFromSnapshot: boolean = React.useMemo(
     () => !isEqual( snapshot, state ),
     [state, snapshot],
   );
 
-  const discardChanges = () => {
+  const discardChanges = React.useCallback( () => {
     if ( !snapshot ) {
       return;
     }
     dispatch( { type: EXPLORE_ACTION.DISCARD, snapshot } );
-  };
+  }, [snapshot] );
 
-  const isNotInitialState: boolean = Object.keys( initialState ).some(
-    key => initialState[key] !== state[key],
+  const isNotInitialState: boolean = React.useMemo(
+    () => Object.keys( initialState ).some(
+      key => initialState[key] !== state[key],
+    ),
+    [state],
   );
 
-  let numberOfFilters: number = Object.keys( calculatedFilters ).reduce(
-    ( count, key ) => {
-      if ( state[key] !== calculatedFilters[key] ) {
-        return count + 1;
-      }
-      return count;
-    },
-    0,
-  );
-  // If both low and high rank filters are set, we only count one filter
-  if ( state.lrank && state.hrank ) {
-    numberOfFilters -= 1;
-  }
+  const numberOfFilters: number = React.useMemo( () => {
+    let count: number = Object.keys( calculatedFilters ).reduce(
+      ( total, key ) => {
+        if ( state[key] !== calculatedFilters[key] ) {
+          return total + 1;
+        }
+        return total;
+      },
+      0,
+    );
+    // If both low and high rank filters are set, we only count one filter
+    if ( state.lrank && state.hrank ) {
+      count -= 1;
+    }
+    return count;
+  }, [state] );
 
-  // eslint-disable-next-line react/jsx-no-constructed-context-values
-  const value = {
+  const value = React.useMemo( () => ( {
     state,
     dispatch,
     defaultExploreLocation,
@@ -698,7 +703,14 @@ const ExploreProvider = ( { children }: ExploreProviderProps ) => {
     makeSnapshot,
     differsFromSnapshot,
     discardChanges,
-  };
+  } ), [
+    state,
+    isNotInitialState,
+    numberOfFilters,
+    makeSnapshot,
+    differsFromSnapshot,
+    discardChanges,
+  ] );
   return (
     <ExploreContext.Provider value={value}>{children}</ExploreContext.Provider>
   );

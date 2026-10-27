@@ -21,7 +21,27 @@ const ScrollViewWrapper = ( {
   style,
   scrollRef,
 }: Props ) => {
-  const dismissKeyboard = () => Keyboard.dismiss();
+  // Dismissing the keyboard on every scroll frame means a native call per frame even once the
+  // keyboard is gone. Track visibility so scrolling stays free of native work when it's hidden.
+  const keyboardVisible = React.useRef( false );
+  React.useEffect( ( ) => {
+    // The keyboard may already be up when this mounts (e.g. an autofocused input)
+    keyboardVisible.current = Keyboard.isVisible( );
+    const showSubscription = Keyboard.addListener( "keyboardDidShow", ( ) => {
+      keyboardVisible.current = true;
+    } );
+    const hideSubscription = Keyboard.addListener( "keyboardDidHide", ( ) => {
+      keyboardVisible.current = false;
+    } );
+    return ( ) => {
+      showSubscription.remove( );
+      hideSubscription.remove( );
+    };
+  }, [] );
+
+  const dismissKeyboard = ( ) => {
+    if ( keyboardVisible.current ) Keyboard.dismiss( );
+  };
 
   return (
     <View className="flex-1 bg-white" style={style} testID={testID}>

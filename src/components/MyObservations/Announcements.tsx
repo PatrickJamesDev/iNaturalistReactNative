@@ -11,7 +11,7 @@ import type { ApiAnnouncement } from "api/types";
 import { ActivityIndicator } from "components/SharedComponents";
 import { View } from "components/styledComponents";
 import type { ComponentProps } from "react";
-import React from "react";
+import React, { useMemo } from "react";
 import { WebView } from "react-native-webview";
 import { log } from "sharedHelpers/logger";
 import { openExternalWebBrowser } from "sharedHelpers/util";
@@ -148,17 +148,19 @@ const Announcements = ( {
     },
   );
 
-  if ( !isConnected ) {
-    return null;
-  }
-  if ( !announcements || announcements.length === 0 ) {
-    return null;
-  }
+  // Sort by start date, oldest first. Copy before sorting: announcements is react-query's
+  // cached array, and sorting in place mutated the cache order on every render.
+  // Hoisted above the early returns so the hook order stays stable.
+  const topAnnouncement = useMemo( ( ) => {
+    if ( !announcements || announcements.length === 0 ) return null;
+    return [...announcements].sort(
+      ( a, b ) => new Date( a.start ).getTime() - new Date( b.start ).getTime(),
+    )[0];
+  }, [announcements] );
 
-  const homeAnnouncements = announcements
-    // Sort by start date, oldest first
-    .sort( ( a, b ) => new Date( a.start ).getTime() - new Date( b.start ).getTime() );
-  const topAnnouncement = homeAnnouncements[0];
+  if ( !isConnected || !topAnnouncement ) {
+    return null;
+  }
   const { id, dismissible, body } = topAnnouncement;
   const announcementHtml = `
   <html>

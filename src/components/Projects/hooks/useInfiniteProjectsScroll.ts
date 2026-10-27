@@ -1,6 +1,7 @@
 import type { PROJECT_SUMMARY_FIELDS } from "api/fields";
 import { searchProjects } from "api/projects";
 import flatten from "lodash/flatten";
+import { useMemo } from "react";
 import {
   useAuthenticatedInfiniteQuery,
 } from "sharedHooks";
@@ -62,14 +63,13 @@ const useInfiniteProjectsScroll = (
     /* eslint-enable consistent-return */
   );
 
-  const pages = data?.pages;
-  const allResults = pages?.map( page => page?.results );
-  const flattenedProjects = flatten( allResults );
   // If the server has a requested order, keep it (e.g. Nearby tab's order_by=distance);
-  // otherwise, alphabetize
-  const projects = baseParams.order_by
-    ? flattenedProjects
-    : flattenedProjects.sort( ( a, b ) => {
+  // otherwise, alphabetize. Memoized so the list data keeps its identity between unrelated
+  // renders and we don't re-sort on every keystroke in the search field.
+  const projects = useMemo( ( ) => {
+    const flattenedProjects = flatten( data?.pages?.map( page => page?.results ) );
+    if ( baseParams.order_by ) return flattenedProjects;
+    return [...flattenedProjects].sort( ( a, b ) => {
       if ( a.title < b.title ) {
         return -1;
       }
@@ -78,6 +78,7 @@ const useInfiniteProjectsScroll = (
       }
       return 0;
     } );
+  }, [baseParams.order_by, data?.pages] );
 
   return {
     isFetching,

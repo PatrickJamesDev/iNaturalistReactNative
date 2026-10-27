@@ -1,23 +1,19 @@
-import {
-  useEffect,
-  useState,
-} from "react";
-import DeviceInfo from "react-native-device-info";
+import { useWindowDimensions } from "react-native";
 
-const useFontScale = ( ): {
+const LARGE_FONT_SCALE = 1.3;
+
+interface FontScale {
   isLargeFontScale: boolean;
-} => {
-  const [isLargeFontScale, setIsLargeFontScale] = useState<boolean>( false );
+}
 
-  useEffect( ( ) => {
-    DeviceInfo.getFontScale().then( fontScale => {
-      if ( fontScale > 1.3 ) setIsLargeFontScale( true );
-      else setIsLargeFontScale( false );
-    } );
-  }, [] );
-
+// Read the system font scale synchronously from window dimensions instead of
+// asking DeviceInfo and setting state on mount. This hook is used by every
+// taxon tile in a grid, where the old version did a native bridge round trip
+// and an extra render per mounted (and recycled) cell.
+const useFontScale = ( ): FontScale => {
+  const { fontScale } = useWindowDimensions( );
   return {
-    isLargeFontScale,
+    isLargeFontScale: fontScale > LARGE_FONT_SCALE,
   };
 };
 

@@ -71,4 +71,4 @@ const SmallGridObsItem = ( {
   );
 };
 
-export default SmallGridObsItem;
+export default React.memo( SmallGridObsItem );

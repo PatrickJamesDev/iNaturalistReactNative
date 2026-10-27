@@ -29,6 +29,9 @@ export interface MyObservationsState {
 
 const NONE_CLOSED: Set<ICONIC_TAXA_GROUP> = new Set( );
 
+// Non-reactive scroll position; see the setMyObsOffset comment above.
+let currentMyObsOffset = 0;
+
 export const initialMyObservationsState: MyObservationsState = {
   observationsSort: OBSERVATIONS_SORT.DATE_UPLOADED_NEWEST,
   speciesSort: SPECIES_SORT.COUNT_DESC,
@@ -53,8 +56,10 @@ export interface MyObservationsSlice {
   clearMyObservationsViewState: ( ) => void;
 
   // Scroll position so we can put the user back where they were when they
-  // return from the NoBottomTabStackNavigator.
-  myObsOffset: number;
+  // return from the NoBottomTabStackNavigator. The offset itself deliberately
+  // lives in a module variable rather than in state: it changes on every
+  // scroll frame, and every state write makes zustand's persist middleware
+  // serialize the whole persisted store and write it to MMKV synchronously.
   setMyObsOffset: ( _newOffset: number ) => void;
   myObsOffsetToRestore: number;
   setMyObsOffsetToRestore: ( ) => void;
@@ -70,7 +75,7 @@ export interface MyObservationsSlice {
   setNumOfUserSpecies: ( _newNum: number ) => void;
 }
 
-const createMyObservationsSlice: StateCreator<MyObservationsSlice> = ( set, get ) => ( {
+const createMyObservationsSlice: StateCreator<MyObservationsSlice> = set => ( {
   myObservations: initialMyObservationsState,
   updateMyObservations: updater => set( state => {
     const myObservations = updater( state.myObservations );
@@ -94,10 +99,11 @@ const createMyObservationsSlice: StateCreator<MyObservationsSlice> = ( set, get 
     myObservationsClosedIconicTaxaCategories: NONE_CLOSED,
   } ),
 
-  myObsOffset: 0,
-  setMyObsOffset: newOffset => set( { myObsOffset: newOffset } ),
+  setMyObsOffset: newOffset => {
+    currentMyObsOffset = newOffset;
+  },
   myObsOffsetToRestore: 0,
-  setMyObsOffsetToRestore: ( ) => set( { myObsOffsetToRestore: get( ).myObsOffset } ),
+  setMyObsOffsetToRestore: ( ) => set( { myObsOffsetToRestore: currentMyObsOffset } ),
   resetMyObsOffsetToRestore: ( ) => set( { myObsOffsetToRestore: 0 } ),
 
   numOfUserObservations: 0,

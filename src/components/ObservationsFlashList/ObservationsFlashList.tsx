@@ -19,17 +19,16 @@ import type {
   LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, StyleProp, ViewStyle,
 } from "react-native";
 import { Animated } from "react-native";
-import RealmObservation from "realmModels/Observation";
+import type { RealmObservation as RealmObservationType } from "realmModels/types";
 import {
   useCurrentUser,
   useGridLayout,
-  useLayoutPrefs,
   useNavigateToObsEdit,
   useTranslation,
 } from "sharedHooks";
 import useStore from "stores/useStore";
 
-import ObsPressable from "./ObsPressable";
+import ObsFlashListCell from "./ObsFlashListCell";
 
 const { useRealm } = RealmContext;
 
@@ -92,15 +91,11 @@ const ObservationsFlashList = ( {
   showNoResults,
   testID,
 }: Props ) => {
-  const {
-    isDefaultMode,
-  } = useLayoutPrefs( );
+  const isDefaultMode = useStore( state => state.layout.isDefaultMode );
   const realm = useRealm( );
   const currentUser = useCurrentUser( );
   const navigation = useNavigation( );
   const navigateToObsEdit = useNavigateToObsEdit( );
-  const uploadQueue = useStore( state => state.uploadQueue );
-  const totalUploadProgress = useStore( state => state.totalUploadProgress );
   const [refreshing, setRefreshing] = useState( false );
 
   const onRefresh = async ( ) => {
@@ -116,6 +111,32 @@ const ObservationsFlashList = ( {
   } = useGridLayout( layout );
   const { t } = useTranslation( );
 
+  // Keep this identity stable: FlashList re-renders visible cells when renderItem changes, and
+  // the only fast-changing data (upload progress) is now subscribed per cell in
+  // ObsFlashListCell.
+  const handleItemPress = useCallback( (
+    uuid: string,
+    obsNeedsSync: boolean,
+    observation: RealmObservationType | null,
+  ) => {
+    if ( obsNeedsSync && !isDefaultMode && observation ) {
+      navigateToObsEdit( observation );
+    } else {
+      // Uniquely identify the list this observation appears in so we can ensure
+      // ObsDetails doesn't get pushed onto the stack twice after multiple taps
+      navigation.navigate( {
+        key: `Obs-${obsListKey}-${uuid}`,
+        name: "ObsDetails",
+        params: { uuid },
+      } );
+    }
+  }, [
+    isDefaultMode,
+    navigateToObsEdit,
+    navigation,
+    obsListKey,
+  ] );
+
   const renderItem = useCallback( ( { item }: { item: { uuid: string; empty: boolean } } ) => {
     // Empty box
     if ( item.empty ) {
@@ -126,55 +147,21 @@ const ObservationsFlashList = ( {
         />
       );
     }
-    const { uuid } = item;
-    const onUploadButtonPress = ( ) => handleIndividualUploadPress( uuid );
-    // TODO: may want push this into one connected wrapper that serves list, grid, and small-grid
-    // layouts (probably folded into ObsPressable) that subscribes to the upload store with
-    // narrow selectors, the way MyObservations/SmallGridObsItemContainer now does. Computing it
-    // here means every visible cell re-renders on every upload progress tick.
-    const obsNeedsSync = RealmObservation.isUnsyncedObservation( realm, item );
-    const obsUploadState = totalUploadProgress.find( o => o.uuid === uuid );
-    const uploadProgress = obsNeedsSync
-      ? obsUploadState?.totalProgress || 0
-      : obsUploadState?.totalProgress;
-
-    const queued = uploadQueue.includes( uuid );
-
-    const onItemPress = ( ) => {
-      if ( obsNeedsSync && !isDefaultMode ) {
-        const realmObservation = realm.objectForPrimaryKey( "Observation", uuid );
-        navigateToObsEdit( realmObservation );
-      } else {
-        // Uniquely identify the list this observation appears in so we can ensure
-        // ObsDetails doesn't get pushed onto the stack twice after multiple taps
-        navigation.navigate( {
-          key: `Obs-${obsListKey}-${uuid}`,
-          name: "ObsDetails",
-          params: { uuid },
-        } );
-      }
-    };
 
     return (
-      <ObsPressable
+      <ObsFlashListCell
         currentUser={currentUser}
         explore={explore}
         gridItemStyle={gridItemStyle}
+        handleIndividualUploadPress={handleIndividualUploadPress}
+        handleItemPress={handleItemPress}
         hideMetadata={hideMetadata}
-        hideObsUploadStatus={hideObsUploadStatus}
         hideObsStatus={hideObsStatus}
-        isSimpleObsStatus={isSimpleObsStatus}
+        hideObsUploadStatus={hideObsUploadStatus}
         hideRGLabel={hideRGLabel}
+        isSimpleObsStatus={isSimpleObsStatus}
+        item={item}
         layout={layout}
-        apiObservation={explore
-          ? item
-          : undefined}
-        uuid={uuid}
-        onItemPress={onItemPress}
-        onUploadButtonPress={onUploadButtonPress}
-        queued={queued}
-        unsynced={obsNeedsSync}
-        uploadProgress={uploadProgress}
       />
     );
   }, [
@@ -182,19 +169,13 @@ const ObservationsFlashList = ( {
     explore,
     gridItemStyle,
     handleIndividualUploadPress,
+    handleItemPress,
     hideMetadata,
     hideObsUploadStatus,
     hideObsStatus,
     isSimpleObsStatus,
     hideRGLabel,
-    isDefaultMode,
     layout,
-    navigateToObsEdit,
-    navigation,
-    obsListKey,
-    realm,
-    totalUploadProgress,
-    uploadQueue,
   ] );
 
   const itemSeparatorComponent = useMemo( ( ) => {
@@ -261,7 +242,13 @@ const ObservationsFlashList = ( {
 
   // only used id as a fallback key because after upload
   // react thinks we've rendered a second item w/ a duplicate key
-  const keyExtractor = item => item.uuid || item.id;
+  const keyExtractor = useCallback(
+    ( item: unknown ): string => {
+      const { uuid, id } = item as { uuid?: string; id?: number };
+      return uuid || String( id ?? "" );
+    },
+    [],
+  );
 
   const onMomentumScrollEnd = useCallback( ( ) => {
     if ( dataCanBeFetched ) {

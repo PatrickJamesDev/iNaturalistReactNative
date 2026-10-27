@@ -85,27 +85,26 @@ const Projects = ( {
 
   const emptyListComponent = useMemo( ( ) => {
     if ( isLoading ) {
-      <ActivityIndicator size={50} />;
-    } else {
-      return (
-        <FlashListEmptyWrapper
-          headerHeight={searchInput.length === 0
-            ? HEADER_HEIGHT_WITH_TABS
-            : HEADER_HEIGHT_WITHOUT_TABS}
-          emptyItemHeight={90}
-          containerClassName="self-center w-full"
-        >
-          <Body1 className="self-center">{t( "No-projects-match-that-search" )}</Body1>
-          <View className="p-4 mt-2">
-            <Button
-              level="neutral"
-              text={t( "RESET-SEARCH" )}
-              onPress={( ) => setSearchInput( "" )}
-            />
-          </View>
-        </FlashListEmptyWrapper>
-      );
+      return <ActivityIndicator size={50} />;
     }
+    return (
+      <FlashListEmptyWrapper
+        headerHeight={searchInput.length === 0
+          ? HEADER_HEIGHT_WITH_TABS
+          : HEADER_HEIGHT_WITHOUT_TABS}
+        emptyItemHeight={90}
+        containerClassName="self-center w-full"
+      >
+        <Body1 className="self-center">{t( "No-projects-match-that-search" )}</Body1>
+        <View className="p-4 mt-2">
+          <Button
+            level="neutral"
+            text={t( "RESET-SEARCH" )}
+            onPress={( ) => setSearchInput( "" )}
+          />
+        </View>
+      </FlashListEmptyWrapper>
+    );
 
     if ( searchInput.length === 0 ) {
       if ( currentTabId === TAB_ID.JOINED && !memberId ) {

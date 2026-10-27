@@ -7,7 +7,7 @@ import GradientButton from "components/SharedComponents/Buttons/GradientButton";
 import { navigationRef } from "navigation/navigationUtils";
 import * as React from "react";
 import { log } from "sharedHelpers/logger";
-import { useCurrentUser, useLayoutPrefs, useTranslation } from "sharedHooks";
+import { useCurrentUser, useTranslation } from "sharedHooks";
 import useStore, { zustandStorage } from "stores/useStore";
 
 const logger = log.extend( "AddObsButton" );
@@ -22,7 +22,7 @@ const AddObsButton = ( ): React.Node => {
   const openBottomSheet = React.useCallback( () => setShowBottomSheet( true ), [] );
   const closeBottomSheet = React.useCallback( () => setShowBottomSheet( false ), [] );
 
-  const { isAllAddObsOptionsMode } = useLayoutPrefs( );
+  const isAllAddObsOptionsMode = useStore( state => state.layout.isAllAddObsOptionsMode );
   const currentUser = useCurrentUser( );
 
   // #region Tooltip logic

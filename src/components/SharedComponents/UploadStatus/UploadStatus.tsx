@@ -3,7 +3,8 @@ import { CircleDots, INatIcon, INatIconButton } from "components/SharedComponent
 import { View } from "components/styledComponents";
 import type { PropsWithChildren, ReactNode } from "react";
 import React from "react";
-import { useLayoutPrefs, useTranslation } from "sharedHooks";
+import { useTranslation } from "sharedHooks";
+import useStore from "stores/useStore";
 import colors from "styles/tailwindColors";
 
 import FadeOutFadeInIcon from "./FadeOutFadeInIcon";
@@ -38,7 +39,7 @@ const UploadStatus = ( {
   queued,
   obsStatus,
 }: Props ) => {
-  const { isDefaultMode } = useLayoutPrefs();
+  const isDefaultMode = useStore( state => state.layout.isDefaultMode );
   const { t } = useTranslation( );
   const completeColor = ( white
     ? colors.white

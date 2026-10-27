@@ -81,6 +81,13 @@ const authCache: AuthCache = {
   cacheTimeout: 5000,
 };
 
+// Auth checks are kicked off by every authenticated query hook. Without deduping,
+// a screen with a dozen queries issues a dozen concurrent secure-storage reads the
+// first time it mounts, and each resolution re-renders its hook. Share one request.
+let pendingIsLoggedInCheck: Promise<boolean> | null = null;
+let authCacheGeneration = 0;
+let isLoggedInCheckId = 0;
+
 // module-level tracking of jwt failures. This works around a
 // fault where different parties were competing for retries
 // during downtime or cascading auth failure, sometimes requring
@@ -94,6 +101,9 @@ const JWT_REFRESH_BACKOFF_MAX_MS = 60_000;
  * Clear cache for isLoggedIn, and any JWT refresh failure backoff.
  */
 const clearAuthCache = ( ): void => {
+  authCacheGeneration += 1;
+  isLoggedInCheckId += 1;
+  pendingIsLoggedInCheck = null;
   authCache.isLoggedIn = null;
   authCache.lastChecked = null;
   jwtRefreshFailureCount = 0;
@@ -228,18 +238,34 @@ const isLoggedIn = async (): Promise<boolean> => {
     return authCache.isLoggedIn;
   }
 
-  try {
-    const accessToken = await getSensitiveItem( "accessToken" );
-    const result = typeof accessToken === "string";
-
-    authCache.isLoggedIn = result;
-    authCache.lastChecked = now;
-
-    return result;
-  } catch ( error ) {
-    console.warn( "Auth check failed:", error );
-    return false;
+  if ( pendingIsLoggedInCheck ) {
+    return pendingIsLoggedInCheck;
   }
+
+  const generation = authCacheGeneration;
+  isLoggedInCheckId += 1;
+  const checkId = isLoggedInCheckId;
+  pendingIsLoggedInCheck = ( async ( ) => {
+    try {
+      const accessToken = await getSensitiveItem( "accessToken" );
+      const result = typeof accessToken === "string";
+
+      // Don't repopulate the cache with a value that was checked before a sign in/out
+      if ( generation === authCacheGeneration ) {
+        authCache.isLoggedIn = result;
+        authCache.lastChecked = Date.now();
+      }
+
+      return result;
+    } catch ( error ) {
+      console.warn( "Auth check failed:", error );
+      return false;
+    } finally {
+      if ( checkId === isLoggedInCheckId ) pendingIsLoggedInCheck = null;
+    }
+  } )( );
+
+  return pendingIsLoggedInCheck;
 };
 
 /**

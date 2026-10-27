@@ -4,7 +4,7 @@ import {
   CustomFlashList,
 } from "components/SharedComponents";
 import { Pressable, View } from "components/styledComponents";
-import React from "react";
+import React, { useCallback } from "react";
 import {
   useTranslation,
 } from "sharedHooks";
@@ -12,6 +12,11 @@ import {
 import ProjectListItem from "./ProjectListItem";
 
 const ItemSeparator = () => <View className="border-b border-lightGray" />;
+
+interface RenderProjectItem {
+  // eslint-disable-next-line react/no-unused-prop-types
+  item: ApiProjectSummary;
+}
 
 interface Props {
   projects: ApiProjectSummary[];
@@ -33,7 +38,7 @@ const ProjectList = ( {
   const navigation = useNavigation( );
   const { t } = useTranslation( );
 
-  const renderProject = ( { item: project }: { item: ApiProjectSummary } ) => (
+  const renderProject = useCallback( ( { item: project }: RenderProjectItem ) => (
     <Pressable
       className="px-4 py-1.5"
       onPress={( ) => {
@@ -50,6 +55,11 @@ const ProjectList = ( {
     >
       <ProjectListItem item={project} />
     </Pressable>
+  ), [accessibilityLabel, navigation, onPress, t] );
+
+  const keyExtractor = useCallback(
+    ( item: ApiProjectSummary ) => String( item.id ),
+    [],
   );
 
   return (
@@ -58,7 +68,7 @@ const ProjectList = ( {
       ListEmptyComponent={ListEmptyComponent}
       ListFooterComponent={ListFooterComponent}
       data={projects}
-      keyExtractor={( item: ApiProjectSummary ) => item.id}
+      keyExtractor={keyExtractor}
       onEndReached={onEndReached}
       renderItem={renderProject}
       testID="ProjectList"

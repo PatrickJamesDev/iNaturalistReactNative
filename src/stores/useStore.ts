@@ -43,13 +43,72 @@ type StoreState =
 // TODO do *not* export this. This allows any consumer to overwrite *any* part
 // of state, circumventing any getter/setter logic we have in the stores. If
 // you need to modify state, you should be doing so through a store.
+const PERSISTED_STORE_KEY = "persisted-zustand";
+const PERSIST_DEBOUNCE_MS = 250;
+
+// zustand's persist middleware rewrites this key on every store update, including
+// high-frequency ones like upload progress. Those writes serialize the persisted
+// state and hit MMKV synchronously, so coalesce them. Direct reads flush first, so
+// callers still observe fresh data.
+let pendingPersistedWrite: string | number | null = null;
+let lastPersistedWrite: string | number | null = null;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+const flushPendingPersistedWrite = ( ) => {
+  if ( persistTimer ) {
+    clearTimeout( persistTimer );
+    persistTimer = null;
+  }
+  if ( pendingPersistedWrite !== null ) {
+    storage.set( PERSISTED_STORE_KEY, pendingPersistedWrite );
+    lastPersistedWrite = pendingPersistedWrite;
+    pendingPersistedWrite = null;
+  }
+};
+
+// Exported so the app can flush queued writes when it goes to the background,
+// rather than relying on the debounce timer firing before the process is killed.
+export const flushPersistedStoreWrites = ( ) => flushPendingPersistedWrite( );
+
 export const zustandStorage = {
-  setItem: ( name: string, value: string | number ) => storage.set( name, value ),
+  setItem: ( name: string, value: string | number ) => {
+    if ( name !== PERSISTED_STORE_KEY ) {
+      storage.set( name, value );
+      return;
+    }
+    // Upload progress and other unpersisted fields still make zustand call setItem, but the
+    // serialized persisted subset doesn't change, so there's nothing to schedule or write.
+    if ( value === lastPersistedWrite ) {
+      // State reverted to what's already on disk; drop any queued distinct value so the timer
+      // can't write stale data after this point.
+      pendingPersistedWrite = null;
+      if ( persistTimer ) {
+        clearTimeout( persistTimer );
+        persistTimer = null;
+      }
+      return;
+    }
+    pendingPersistedWrite = value;
+    persistTimer ??= setTimeout( flushPendingPersistedWrite, PERSIST_DEBOUNCE_MS );
+  },
   getItem: ( name: string ) => {
+    if ( name === PERSISTED_STORE_KEY ) {
+      flushPendingPersistedWrite( );
+    }
     const value = storage.getString( name ) || storage.getNumber( name );
     return value ?? null;
   },
-  removeItem: ( name: string ) => storage.delete( name ),
+  removeItem: ( name: string ) => {
+    if ( name === PERSISTED_STORE_KEY ) {
+      pendingPersistedWrite = null;
+      lastPersistedWrite = null;
+      if ( persistTimer ) {
+        clearTimeout( persistTimer );
+        persistTimer = null;
+      }
+    }
+    storage.delete( name );
+  },
 };
 
 // Using slices to separate store for Explore and Observation creation flow

@@ -31,7 +31,6 @@ import {
   useCurrentUser,
   useInfiniteObservationsScroll,
   useInfiniteScroll,
-  useLayoutPrefs,
   useNavigateToObsEdit,
   useObservationsUpdates,
   useStoredLayout,
@@ -65,7 +64,8 @@ export enum ACTIVE_SHEET {
 }
 
 const MyObservationsResults = ( ) => {
-  const { isDefaultMode, loggedInWhileInDefaultMode } = useLayoutPrefs();
+  const isDefaultMode = useStore( state => state.layout.isDefaultMode );
+  const loggedInWhileInDefaultMode = useStore( state => state.loggedInWhileInDefaultMode );
   const { t } = useTranslation( );
   const realm = useRealm( );
   const navigation = useNavigation( );
@@ -75,7 +75,6 @@ const MyObservationsResults = ( ) => {
 
   const { state: myObsState, dispatch: myObsDispatch } = useMyObservations( );
 
-  const uploadQueue = useStore( state => state.uploadQueue );
   const setStartUploadObservations = useStore( state => state.setStartUploadObservations );
   const addToUploadQueue = useStore( state => state.addToUploadQueue );
   const addTotalToolbarIncrements = useStore( state => state.addTotalToolbarIncrements );
@@ -84,7 +83,6 @@ const MyObservationsResults = ( ) => {
   const myObsOffsetToRestore = useStore( state => state.myObsOffsetToRestore );
   const setMyObsOffset = useStore( state => state.setMyObsOffset );
   const clearMyObservationsViewState = useStore( state => state.clearMyObservationsViewState );
-  const uploadStatus = useStore( state => state.uploadStatus );
   const justFinishedSignup: boolean = useStore( state => state.layout.justFinishedSignup );
   // As soon as we leave this screen, the user is no longer considered as just finished signup
   const setJustFinishedSignup = useStore( state => state.layout.setJustFinishedSignup );
@@ -243,6 +241,9 @@ const MyObservationsResults = ( ) => {
   ] );
 
   const handleIndividualUploadPress = useCallback( uuid => {
+    // Read the queue at press time instead of subscribing to it: subscribing made every queue
+    // change re-render this whole screen (and every visible tile) just to refresh this closure.
+    const { uploadQueue, uploadStatus: currentUploadStatus } = useStore.getState( );
     const uploadExists = uploadQueue.includes( uuid );
     if ( uploadExists ) return;
     const observation = realm.objectForPrimaryKey<RealmObservation>( "Observation", uuid );
@@ -254,7 +255,7 @@ const MyObservationsResults = ( ) => {
     if ( !confirmInternetConnection( ) ) return;
     addTotalToolbarIncrements( observation );
     addToUploadQueue( uuid );
-    if ( uploadStatus === UPLOAD_PENDING ) {
+    if ( currentUploadStatus === UPLOAD_PENDING ) {
       setStartUploadObservations( );
     }
   }, [
@@ -266,8 +267,6 @@ const MyObservationsResults = ( ) => {
     navigateToObsEdit,
     realm,
     setStartUploadObservations,
-    uploadQueue,
-    uploadStatus,
   ] );
 
   // 20241107 amanda - this seems to be a culprit for the tab bar being less
@@ -339,13 +338,13 @@ const MyObservationsResults = ( ) => {
 
   // Keep track of the scroll offset so we can restore it when we mount
   // this component again after returning from ObsEdit
-  const onScroll = ( scrollEvent: {
+  const onScroll = useCallback( ( scrollEvent: {
     nativeEvent: {
       contentOffset: {
         y: number;
       };
     };
-  } ) => setMyObsOffset( scrollEvent.nativeEvent.contentOffset.y );
+  } ) => setMyObsOffset( scrollEvent.nativeEvent.contentOffset.y ), [setMyObsOffset] );
 
   const numOfUserObservations = zustandStorage.getItem( "numOfUserObservations" );
   const numOfUserSpecies = zustandStorage.getItem( "numOfUserSpecies" );
@@ -362,19 +361,22 @@ const MyObservationsResults = ( ) => {
     // Calculate obs and leaf taxa counts from local observations
     const distinctTaxonObs = realm.objects<RealmObservation>( "Observation" )
       .filtered( "taxon != null DISTINCT(taxon.id)" );
-    const taxonIds: number[] = distinctTaxonObs
-      .map( o => o.taxon?.id || 0 )
-      .filter( Boolean );
-    const ancestorIds = distinctTaxonObs.map( o => {
+    const taxonIds: number[] = [];
+    const ancestorIds = new Set<number>( );
+    distinctTaxonObs.forEach( o => {
+      const taxonId = o.taxon?.id;
+      if ( !taxonId ) return;
+      taxonIds.push( taxonId );
       // We're filtering b/c for taxa above species level, the taxon's own
       // ID is included in ancestor ids for some reason (this is a bug...
       // somewhere)
-      const taxonAncestorIds = (
-        o.taxon?.ancestor_ids || []
-      ).filter( id => Number( id ) !== Number( o.taxon?.id ) );
-      return taxonAncestorIds;
-    } ).flat( );
-    const leafTaxonIds = taxonIds.filter( taxonId => !ancestorIds.includes( taxonId ) );
+      ( o.taxon?.ancestor_ids || [] ).forEach( ancestorId => {
+        if ( Number( ancestorId ) !== Number( taxonId ) ) {
+          ancestorIds.add( Number( ancestorId ) );
+        }
+      } );
+    } );
+    const leafTaxonIds = taxonIds.filter( taxonId => !ancestorIds.has( taxonId ) );
 
     return {
       leafTaxonIds,
@@ -390,9 +392,24 @@ const MyObservationsResults = ( ) => {
     const localObs = realm.objects<RealmObservation>( "Observation" )
       .filtered( "taxon.id IN $0", leafTaxonIds );
 
-    return leafTaxonIds.map( id => {
-      const obs = localObs.filter( o => o.taxon.id === id );
-      return { count: obs.length, taxon: obs[0].taxon };
+    // Group in a single pass instead of filtering the whole collection once per leaf taxon
+    const countsByTaxonId = new Map<number, { count: number; taxon: RealmObservation["taxon"] }>( );
+    localObs.forEach( o => {
+      const taxonId = o.taxon?.id;
+      if ( !taxonId ) return;
+      const existing = countsByTaxonId.get( taxonId );
+      if ( existing ) {
+        existing.count += 1;
+      } else {
+        countsByTaxonId.set( taxonId, { count: 1, taxon: o.taxon } );
+      }
+    } );
+
+    return leafTaxonIds.flatMap( id => {
+      const entry = countsByTaxonId.get( id );
+      return entry
+        ? [entry]
+        : [];
     } );
   }, [currentUser, activeTab, realm, leafTaxonIds] );
 

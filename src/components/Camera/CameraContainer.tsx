@@ -107,26 +107,16 @@ const CameraContainer = ( ) => {
     ],
   } );
   const devices = useCameraDevices( );
-  devices.sort( ( a, b ) => {
-    const aMatchesPosition = a.position === cameraPosition
-      ? 0
-      : 1;
-    const bMatchesPosition = b.position === cameraPosition
-      ? 0
-      : 1;
-    return aMatchesPosition - bMatchesPosition;
-  } );
-  const activeDevice = device || devices[0];
+  // Prefer a device matching the selected side rather than sorting the library's array in place
+  const activeDevice = device
+    || devices.find( d => d.position === cameraPosition )
+    || devices[0];
   const [loadingDevices, setLoadingDevices] = useState( true );
-  const [timeoutId, setTimeoutId] = useState<undefined | ReturnType<typeof setTimeout> | null>(
-    undefined,
-  );
-  if ( timeoutId === undefined ) {
-    setTimeoutId( setTimeout( () => {
-      setLoadingDevices( false );
-      setTimeoutId( null );
-    }, 700 ) );
-  }
+
+  useEffect( ( ) => {
+    const timer = setTimeout( ( ) => setLoadingDevices( false ), 700 );
+    return ( ) => clearTimeout( timer );
+  }, [] );
 
   const hasFlash = activeDevice?.hasFlash;
   const initialPhotoOptions = {

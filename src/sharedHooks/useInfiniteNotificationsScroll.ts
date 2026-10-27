@@ -187,6 +187,11 @@ const useInfiniteNotificationsScroll = (
     }
   }, [isFetching] );
 
+  const notifications = useMemo<Notification[]>(
+    ( ) => flatten( data?.pages as Notification[][] | undefined ),
+    [data?.pages],
+  );
+
   return {
     refetch,
     isError,
@@ -197,7 +202,7 @@ const useInfiniteNotificationsScroll = (
     fetchNextPage: currentUser
       ? fetchNextPage
       : ( ) => undefined,
-    notifications: flatten( data?.pages ),
+    notifications,
   };
 };
 

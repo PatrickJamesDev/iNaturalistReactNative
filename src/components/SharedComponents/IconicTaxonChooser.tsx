@@ -111,6 +111,7 @@ const IconicTaxonChooser = ( {
       contentContainerStyle={contentContainerStyle}
       data={iconicTaxonIcons}
       horizontal
+      keyExtractor={item => item}
       keyboardShouldPersistTaps="handled"
       renderItem={renderIcon}
       showsHorizontalScrollIndicator={false}

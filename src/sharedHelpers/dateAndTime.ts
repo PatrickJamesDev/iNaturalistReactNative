@@ -293,6 +293,16 @@ function formatDifferenceForHumans( date: Date | string, i18n: i18next ) {
 
 const ZONE_ABBREVIATION_TOKEN = /z+/;
 
+function getLocalTimeZone( ): string {
+  return Intl.DateTimeFormat( ).resolvedOptions( ).timeZone;
+}
+
+// formatInTimeZone builds a fresh Intl formatter on every call. Cache the formatted strings
+// themselves - observation dates repeat constantly while scrolling - with a hard cap so this
+// can't grow without bound.
+const FORMAT_CACHE_LIMIT = 1000;
+const formattedDateCache = new Map<string, string>( );
+
 // Hermes' Intl.DateTimeFormat has incomplete ICU time zone name data for
 // some zones (seen so far: Australia/Sydney, Asia/Kolkata, Asia/Singapore)
 // and silently resolves the abbreviated zone name to the literal string
@@ -351,14 +361,13 @@ function formatDateString(
     // If we received a time zone, display the time in the requested zone
     options.timeZone
     // Otherwise use the system / local time zone
-    || Intl.DateTimeFormat( ).resolvedOptions( ).timeZone
+    || getLocalTimeZone( )
   );
   let isoDateString = dateString;
   if ( options.literalTime ) {
     isoDateString = dateString.replace( /[+-]\d\d:\d\d/, "" );
     isoDateString = isoDateString.replace( "Z", "" );
-    // eslint-disable-next-line prefer-destructuring
-    timeZone = Intl.DateTimeFormat( ).resolvedOptions( ).timeZone;
+    timeZone = getLocalTimeZone( );
   }
 
   const parsedDate = parseISO( isoDateString );
@@ -376,6 +385,12 @@ function formatDateString(
   }
 
   try {
+    const cacheKey = [fmt, i18n.language, timeZone, isoDateString].join( "\u0000" );
+    const cachedFormattedDate = formattedDateCache.get( cacheKey );
+    if ( cachedFormattedDate !== undefined ) {
+      return cachedFormattedDate;
+    }
+
     const locale = dateFnsLocale( i18n.language );
     let formatString = fmt;
     if (
@@ -386,12 +401,17 @@ function formatDateString(
       // abbreviation Hermes can't reliably resolve for this zone
       formatString = formatString.replace( ZONE_ABBREVIATION_TOKEN, "O" );
     }
-    return formatInTimeZone(
+    const formattedDate = formatInTimeZone(
       parsedDate,
       timeZone,
       formatString,
       { locale },
     );
+    if ( formattedDateCache.size >= FORMAT_CACHE_LIMIT ) {
+      formattedDateCache.clear( );
+    }
+    formattedDateCache.set( cacheKey, formattedDate );
+    return formattedDate;
   } catch ( error ) {
     console.warn( "Error formatting date", error );
     // In case of: RangeError: Incorrect timeZone information provided
@@ -519,7 +539,7 @@ function formatProjectsApiDatetimeLong(
 function formatObsFieldDate( date: Date ): string {
   return formatInTimeZone(
     date,
-    Intl.DateTimeFormat( ).resolvedOptions( ).timeZone,
+    getLocalTimeZone( ),
     "yyyy-MM-dd",
   );
 }
@@ -527,7 +547,7 @@ function formatObsFieldDate( date: Date ): string {
 function formatObsFieldTime( date: Date ): string {
   return formatInTimeZone(
     date,
-    Intl.DateTimeFormat( ).resolvedOptions( ).timeZone,
+    getLocalTimeZone( ),
     "HH:mm",
   );
 }
@@ -535,7 +555,7 @@ function formatObsFieldTime( date: Date ): string {
 function formatObsFieldDatetime( date: Date ): string {
   return formatInTimeZone(
     date,
-    Intl.DateTimeFormat( ).resolvedOptions( ).timeZone,
+    getLocalTimeZone( ),
     "yyyy-MM-dd HH:mm",
   );
 }

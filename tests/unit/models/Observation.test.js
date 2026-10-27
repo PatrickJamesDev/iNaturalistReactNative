@@ -99,6 +99,76 @@ describe( "Observation", ( ) => {
       );
     } );
 
+    it( "should skip an unchanged remote observation on a repeat upsert", ( ) => {
+      const updatedAt = "2024-01-01T00:00:00.000Z";
+      const mockRemoteObservation = factory( "RemoteObservation", {
+        updated_at: updatedAt,
+        description: "server v1",
+      } );
+
+      Observation.upsertRemoteObservations( [mockRemoteObservation], global.realm );
+
+      const firstUpsert = global.realm.objectForPrimaryKey(
+        "Observation",
+        mockRemoteObservation.uuid,
+      );
+      const syncedAt = firstUpsert._synced_at;
+      safeRealmWrite( global.realm, ( ) => {
+        firstUpsert.description = "local edit";
+      }, "edit observation locally for upsert skip test" );
+
+      Observation.upsertRemoteObservations( [
+        { ...mockRemoteObservation, description: "server v2" },
+      ], global.realm );
+
+      const obs = global.realm.objectForPrimaryKey( "Observation", mockRemoteObservation.uuid );
+      expect( obs.description ).toBe( "local edit" );
+      expect( obs._synced_at.getTime( ) ).toBe( syncedAt.getTime( ) );
+    } );
+
+    it( "should update an observation when the remote updated_at is newer", ( ) => {
+      const mockRemoteObservation = factory( "RemoteObservation", {
+        updated_at: "2024-01-01T00:00:00.000Z",
+        description: "server v1",
+      } );
+      Observation.upsertRemoteObservations( [mockRemoteObservation], global.realm );
+
+      Observation.upsertRemoteObservations( [
+        {
+          ...mockRemoteObservation,
+          updated_at: "2024-01-02T00:00:00.000Z",
+          description: "server v2",
+        },
+      ], global.realm );
+
+      const obs = global.realm.objectForPrimaryKey( "Observation", mockRemoteObservation.uuid );
+      expect( obs.description ).toBe( "server v2" );
+    } );
+
+    it( "should upsert an unchanged observation when force is set", ( ) => {
+      const updatedAt = "2024-01-01T00:00:00.000Z";
+      const mockRemoteObservation = factory( "RemoteObservation", {
+        updated_at: updatedAt,
+        description: "server v1",
+      } );
+      Observation.upsertRemoteObservations( [mockRemoteObservation], global.realm );
+
+      const existing = global.realm.objectForPrimaryKey(
+        "Observation",
+        mockRemoteObservation.uuid,
+      );
+      safeRealmWrite( global.realm, ( ) => {
+        existing.description = "local edit";
+      }, "edit observation locally for forced upsert test" );
+
+      Observation.upsertRemoteObservations( [
+        { ...mockRemoteObservation, description: "server v2" },
+      ], global.realm, { force: true } );
+
+      const obs = global.realm.objectForPrimaryKey( "Observation", mockRemoteObservation.uuid );
+      expect( obs.description ).toBe( "server v2" );
+    } );
+
     it( "should not wipe a stored taxon photo when the taxon has no default_photo", ( ) => {
       const taxonId = 47126;
       const photoUrl = "https://example.com/plantae/square.jpg";

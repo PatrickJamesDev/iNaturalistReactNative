@@ -1,5 +1,4 @@
 import { activateKeepAwake, deactivateKeepAwake } from "@sayem314/react-native-keep-awake";
-import remove from "lodash/remove";
 import type { RealmObservation } from "realmModels/types";
 import filterDirtyPos from "uploaders/dataTransformation/filterDirtyPos";
 import type { StateCreator } from "zustand";
@@ -216,28 +215,30 @@ const createUploadObservationsSlice: StateCreator<UploadObservationsSlice> = ( s
       totalToolbarIncrements,
       totalUploadProgress: existingTotalUploadProgress,
     } = state;
-    // Zustand does *not* make deep copies when making supposedly immutable
-    // state changes, so for nested objects like this, we need to create a
-    // new object explicitly.
-    // https://github.com/pmndrs/zustand/blob/main/docs/guides/immutable-state-and-merging.md#nested-objects
-    const totalUploadProgress = existingTotalUploadProgress
-      ? [...existingTotalUploadProgress]
-      : [];
-    const currentObsProgressObj = totalUploadProgress.find( o => o.uuid === uuid );
-    if ( !currentObsProgressObj && currentUpload ) {
-      const progressObj = createUploadProgressObj(
-        currentUpload,
-        increment,
-      );
-      totalUploadProgress.push( progressObj );
-    } else if ( currentObsProgressObj ) {
-      currentObsProgressObj.currentIncrements += increment;
-    }
-    const obsProgressObj = totalUploadProgress.find( o => o.uuid === uuid );
-    if ( obsProgressObj ) {
-      obsProgressObj.totalProgress = (
-        obsProgressObj.currentIncrements / obsProgressObj.totalIncrements
-      );
+    // Build new objects instead of mutating the existing progress entries. Mutating them in
+    // place kept the same object identities in state, which defeats memoized cells and makes
+    // it possible for two subscribers to observe different values for the same entry.
+    const currentObsProgressObj = existingTotalUploadProgress.find( o => o.uuid === uuid );
+    let totalUploadProgress = existingTotalUploadProgress || [];
+    if ( currentObsProgressObj ) {
+      totalUploadProgress = totalUploadProgress.map( o => {
+        if ( o.uuid !== uuid ) return o;
+        const currentIncrements = o.currentIncrements + increment;
+        return {
+          ...o,
+          currentIncrements,
+          totalProgress: currentIncrements / o.totalIncrements,
+        };
+      } );
+    } else if ( currentUpload ) {
+      const progressObj = createUploadProgressObj( currentUpload, increment );
+      totalUploadProgress = [
+        ...totalUploadProgress,
+        {
+          ...progressObj,
+          totalProgress: progressObj.currentIncrements / progressObj.totalIncrements,
+        },
+      ];
     }
     return {
       totalUploadProgress,
@@ -247,29 +248,21 @@ const createUploadObservationsSlice: StateCreator<UploadObservationsSlice> = ( s
   setUploadStatus: ( uploadStatus: UploadStatus ) => set( ( ) => ( {
     uploadStatus,
   } ) ),
-  addToUploadQueue: ( uuids: string | string[] ) => set( state => {
-    let copyOfUploadQueue = state.uploadQueue;
-    if ( typeof uuids === "string" ) {
-      copyOfUploadQueue.unshift( uuids );
-    } else {
-      copyOfUploadQueue = copyOfUploadQueue.concat( uuids );
-    }
-    return ( {
-      uploadQueue: copyOfUploadQueue,
-      initialNumObservationsInQueue: state.initialNumObservationsInQueue
-        + ( typeof uuids === "string"
-          ? 1
-          : uuids.length ),
-    } );
-  } ),
-  removeFromUploadQueue: ( ) => set( state => {
-    const copyOfUploadQueue = state.uploadQueue;
-    copyOfUploadQueue.pop( );
-    return ( {
-      uploadQueue: copyOfUploadQueue,
-      currentUpload: null,
-    } );
-  } ),
+  addToUploadQueue: ( uuids: string | string[] ) => set( state => ( {
+    // Never mutate the array that's already in state: subscribers that select uploadQueue by
+    // reference would miss the change
+    uploadQueue: typeof uuids === "string"
+      ? [uuids, ...state.uploadQueue]
+      : [...state.uploadQueue, ...uuids],
+    initialNumObservationsInQueue: state.initialNumObservationsInQueue
+      + ( typeof uuids === "string"
+        ? 1
+        : uuids.length ),
+  } ) ),
+  removeFromUploadQueue: ( ) => set( state => ( {
+    uploadQueue: state.uploadQueue.slice( 0, -1 ),
+    currentUpload: null,
+  } ) ),
   setCurrentUpload: observation => set( state => ( {
     currentUpload: observation,
     numUploadsAttempted: state.numUploadsAttempted + 1,
@@ -298,15 +291,14 @@ const createUploadObservationsSlice: StateCreator<UploadObservationsSlice> = ( s
     // state changes, so for nested objects like this, we need to create a
     // new object explicitly.
     // https://github.com/pmndrs/zustand/blob/main/docs/guides/immutable-state-and-merging.md#nested-objects
-    const totalUploadProgress = existingTotalUploadProgress
-      ? [...existingTotalUploadProgress]
-      : [];
-    const observation = totalUploadProgress.find( o => o.uuid === uuid );
-    observation.totalProgress = observation.totalIncrements;
-    observation.currentIncrements = observation.totalIncrements;
+    const totalUploadProgress = ( existingTotalUploadProgress || [] ).map( o => (
+      o.uuid === uuid
+        ? { ...o, totalProgress: o.totalIncrements, currentIncrements: o.totalIncrements }
+        : o
+    ) );
 
     // return the new queue without the uuid of the object already deleted remotely
-    const queueWithDeleted = remove( uploadQueue, uuidInQueue => uuidInQueue !== uuid );
+    const queueWithDeleted = uploadQueue.filter( uuidInQueue => uuidInQueue !== uuid );
 
     return ( {
       uploadQueue: queueWithDeleted,

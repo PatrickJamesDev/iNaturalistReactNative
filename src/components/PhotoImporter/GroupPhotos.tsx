@@ -130,9 +130,9 @@ const GroupPhotos = ( {
     return newData;
   }, [groupedPhotos, totalPhotos] );
 
-  const extraData = {
-    selectedObservations,
-  };
+  // Pass the array itself rather than a fresh wrapper object: a new object
+  // here made FlashList treat every render as a data change.
+  const extraData = selectedObservations;
 
   return (
     <BottomInsetViewWrapper>

@@ -9,6 +9,7 @@ import React, {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
 } from "react";
 import ObservationPhoto from "realmModels/ObservationPhoto";
 import {
@@ -170,6 +171,14 @@ const SuggestionsContainer = ( ) => {
    = onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_ONLINE_FETCHED
       || onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_ONLINE_ERROR;
 
+  // Read the current online status through a ref so these callbacks keep stable
+  // identities. They are effect dependencies in the suggestion hooks, so recreating
+  // them whenever a status changes re-ran ML prediction and Realm taxon writes.
+  const onlineFetchStatusRef = useRef( onlineFetchStatus );
+  useEffect( ( ) => {
+    onlineFetchStatusRef.current = onlineFetchStatus;
+  }, [onlineFetchStatus] );
+
   const onFetchError = useCallback(
     ( { isOnline }: { isOnline: boolean } ) => {
       if ( isOnline ) {
@@ -183,7 +192,7 @@ const SuggestionsContainer = ( ) => {
           offlineFetchStatus: FETCH_STATUSES.FETCH_STATUS_OFFLINE_ERROR,
         } );
         // If offline is finished, and online still in loading state it means it never started
-        if ( onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_LOADING ) {
+        if ( onlineFetchStatusRef.current === FETCH_STATUSES.FETCH_STATUS_LOADING ) {
           dispatch( {
             type: "SET_ONLINE_FETCH_STATUS",
             onlineFetchStatus: FETCH_STATUSES.FETCH_STATUS_ONLINE_SKIPPED,
@@ -191,7 +200,7 @@ const SuggestionsContainer = ( ) => {
         }
       }
     },
-    [onlineFetchStatus],
+    [],
   );
 
   const onFetched = useCallback(
@@ -213,7 +222,7 @@ const SuggestionsContainer = ( ) => {
           offlineFetchStatus: FETCH_STATUSES.FETCH_STATUS_OFFLINE_FETCHED,
         } );
         // If offline is finished, and online still in loading state it means it never started
-        if ( onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_LOADING ) {
+        if ( onlineFetchStatusRef.current === FETCH_STATUSES.FETCH_STATUS_LOADING ) {
           dispatch( {
             type: "SET_ONLINE_FETCH_STATUS",
             onlineFetchStatus: FETCH_STATUSES.FETCH_STATUS_ONLINE_SKIPPED,
@@ -221,7 +230,7 @@ const SuggestionsContainer = ( ) => {
         }
       }
     },
-    [onlineFetchStatus],
+    [],
   );
 
   const {

@@ -1,5 +1,6 @@
 import { searchObservations } from "api/observations";
 import { RealmContext } from "providers/contexts";
+import { useMemo } from "react";
 import Observation from "realmModels/Observation";
 import { log } from "sharedHelpers/logger";
 import type { OBSERVATIONS_SORT } from "sharedHelpers/observationsSort";
@@ -28,6 +29,8 @@ interface UseServerOrderedObservationsParams {
   taxonId?: number;
   enabled?: boolean;
 }
+
+const EMPTY_PAGES: SearchObservationsResponse[] = [];
 
 interface UseServerOrderedObservationsResult {
   observationIds: { uuid: string }[];
@@ -99,10 +102,16 @@ const useServerOrderedObservations = ( {
     },
   );
 
-  const pages: SearchObservationsResponse[] = data?.pages || [];
-  const observationIds = pages
-    .flatMap( page => page.results || [] )
-    .map( ( { uuid } ) => ( { uuid } ) );
+  const pages = data?.pages || EMPTY_PAGES;
+  // This list is the data prop of the observation FlashList. Rebuilding it on
+  // every render (upload progress updates MyObservations frequently) handed the
+  // list a new array of thousands of objects each time.
+  const observationIds = useMemo<{ uuid: string }[]>(
+    ( ) => pages
+      .flatMap( ( page: SearchObservationsResponse ) => page.results || [] )
+      .map( ( { uuid }: SearchObservationsResult ) => ( { uuid } ) ),
+    [pages],
+  );
 
   return {
     observationIds,

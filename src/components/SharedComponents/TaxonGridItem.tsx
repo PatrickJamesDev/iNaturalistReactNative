@@ -4,7 +4,7 @@ import ObsImagePreview from "components/ObservationsFlashList/ObsImagePreview";
 import { Body4, DisplayTaxonName } from "components/SharedComponents";
 import SpeciesSeenCheckmark from "components/SharedComponents/SpeciesSeenCheckmark";
 import { Pressable, View } from "components/styledComponents";
-import React from "react";
+import React, { useMemo } from "react";
 import Photo from "realmModels/Photo";
 import { accessibleTaxonName } from "sharedHelpers/taxon";
 import { useCurrentUser, useFontScale, useTranslation } from "sharedHooks";
@@ -29,7 +29,10 @@ const TaxonGridItem = ( {
   const navigation = useNavigation( );
   const { t } = useTranslation( );
   const currentUser = useCurrentUser( );
-  const accessibleName = accessibleTaxonName( taxon, currentUser, t );
+  const accessibleName = useMemo(
+    ( ) => accessibleTaxonName( taxon, currentUser, t ),
+    [currentUser, t, taxon],
+  );
   const { isLargeFontScale } = useFontScale();
   const route = useRoute( );
 

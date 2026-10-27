@@ -1,7 +1,7 @@
 import classNames from "classnames";
 import { View } from "components/styledComponents";
 import type { PropsWithChildren } from "react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, Keyboard } from "react-native";
 import { getShadow } from "styles/global";
 
@@ -41,12 +41,11 @@ const FloatingActionBar = ( {
   const start = isBottom
     ? BOTTOM_ANIMATION_START + bottomPosition
     : TOP_ANIMATION_START;
-  const animate = useMemo(
-    () => new Animated.Value( show
-      ? start
-      : 0 ),
-    [start, show],
-  );
+  // One value for the lifetime of the component: recreating it whenever show changes made
+  // keyboard-driven re-renders restart the spring from scratch and visibly jump the bar.
+  const [animate] = useState( ( ) => new Animated.Value( show
+    ? start
+    : 0 ) );
 
   useEffect( () => {
     const showSubscription = Keyboard.addListener(
@@ -71,7 +70,9 @@ const FloatingActionBar = ( {
       velocity: 1,
       tension: 2,
       friction: 8,
-      useNativeDriver: false,
+      // translateY is supported by the native driver; keeping this animation off the JS
+      // thread stops it from competing with list scrolling and uploads
+      useNativeDriver: true,
     };
 
     const toValue = show

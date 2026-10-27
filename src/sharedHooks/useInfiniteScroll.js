@@ -1,6 +1,9 @@
 // @flow
 
+import { useMemo } from "react";
 import { useAuthenticatedInfiniteQuery } from "sharedHooks";
+
+const EMPTY_PAGES = [];
 
 const useInfiniteScroll = (
   queryKey: string,
@@ -53,8 +56,18 @@ const useInfiniteScroll = (
     /* eslint-enable consistent-return */
   );
 
-  const pages = data?.pages || [];
-  const allResults = pages?.map( page => page?.results ).flat( Infinity ).filter( Boolean );
+  const pages = data?.pages || EMPTY_PAGES;
+  const allResults = useMemo( ( ) => {
+    const results = [];
+    pages.forEach( page => {
+      if ( page?.results ) {
+        page.results.forEach( r => {
+          if ( r ) results.push( r );
+        } );
+      }
+    } );
+    return results;
+  }, [pages] );
 
   return {
     data: allResults,

@@ -1,7 +1,7 @@
 import classnames from "classnames";
 import { INatIcon } from "components/SharedComponents";
 import { Image, Pressable, View } from "components/styledComponents";
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import type { ListRenderItem } from "react-native";
 import {
   FlatList,
@@ -38,10 +38,10 @@ const PhotoSelector = ( {
   sounds = [],
 }: Props ) => {
   const { t } = useTranslation( );
-  const items = [
+  const items = useMemo( ( ) => [
     ...photos.map( photo => ( { ...photo, type: "photo" as const } ) ),
     ...sounds.map( sound => ( { ...sound, type: "sound" as const } ) ),
-  ];
+  ], [photos, sounds] );
 
   const renderItem: ListRenderItem<PhotoItem | SoundItem> = useCallback( ( { item, index } ) => (
     <Pressable
@@ -90,6 +90,9 @@ const PhotoSelector = ( {
     <View>
       <FlatList
         data={items}
+        keyExtractor={( item, index ) => ( item.type === "photo"
+          ? `photo-${item.url || item.localFilePath || index}`
+          : `sound-${index}` )}
         renderItem={renderItem}
         horizontal
       />

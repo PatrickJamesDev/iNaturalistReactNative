@@ -4,7 +4,8 @@ import React, { useMemo } from "react";
 import RealmObservation from "realmModels/Observation";
 import type { RealmObservation as RealmObservationType } from "realmModels/types";
 import type { UserPojo } from "realmModels/User";
-import { useLayoutPrefs, useListItemObservation, useTranslation } from "sharedHooks";
+import { useListItemObservation, useTranslation } from "sharedHooks";
+import useStore from "stores/useStore";
 
 import ObsGridItem from "./ObsGridItem";
 import ObsListItem from "./ObsListItem";
@@ -60,7 +61,8 @@ const ObsPressable = ( {
   unsynced,
 }: Props ) => {
   const { t } = useTranslation( );
-  const { isDefaultMode } = useLayoutPrefs( );
+  // Narrow selector: tiles only care about this one layout flag, not the whole slice
+  const isDefaultMode = useStore( state => state.layout.isDefaultMode );
   // Only subscribe when nothing else supplies the observation
   const subscribedRealmObs = useListItemObservation(
     apiObservation || observationProp !== undefined

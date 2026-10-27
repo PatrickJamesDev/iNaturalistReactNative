@@ -47,9 +47,10 @@ import {
   useSpeciesSortLabels,
 } from "sharedHelpers/speciesSort";
 import { accessibleTaxonName } from "sharedHelpers/taxon";
-import { useGridLayout, useLayoutPrefs, useTranslation } from "sharedHooks";
+import { useGridLayout, useTranslation } from "sharedHooks";
 import useFeatureFlag from "sharedHooks/useFeatureFlag";
 import { FeatureFlag } from "stores/createFeatureFlagSlice";
+import useStore from "stores/useStore";
 import colors from "styles/tailwindColors";
 import type { SpeciesCount } from "types/sorting";
 
@@ -169,7 +170,7 @@ const MyObservationsSimple = ( {
   loggedInWhileInDefaultMode = false,
   refetchTaxa,
 }: Props ) => {
-  const { isDefaultMode } = useLayoutPrefs( );
+  const isDefaultMode = useStore( state => state.layout.isDefaultMode );
   const { t } = useTranslation( );
   const { dispatch } = useMyObservations( );
   // For now, searching from the species tab requires a signed-in user. for logged-out
@@ -200,7 +201,7 @@ const MyObservationsSimple = ( {
     paddingTop: 10,
   } ), [flashListStyle] );
 
-  const taxaSortOptions = MY_OBSERVATIONS_SPECIES_SORT_OPTIONS.reduce(
+  const taxaSortOptions = useMemo( ( ) => MY_OBSERVATIONS_SPECIES_SORT_OPTIONS.reduce(
     ( acc, sortBy ) => {
       const { label, text } = speciesSortLabels[sortBy];
       acc[sortBy] = {
@@ -211,9 +212,9 @@ const MyObservationsSimple = ( {
       return acc;
     },
     {} as Record<SPECIES_SORT, TaxaSortOption>,
-  );
+  ), [speciesSortLabels] );
 
-  const observationsSortOptions = MY_OBSERVATIONS_SORT_OPTIONS.reduce(
+  const observationsSortOptions = useMemo( ( ) => MY_OBSERVATIONS_SORT_OPTIONS.reduce(
     ( acc, sortBy ) => {
       const { label, text } = observationsSortLabels[sortBy];
       acc[sortBy] = {
@@ -224,7 +225,7 @@ const MyObservationsSimple = ( {
       return acc;
     },
     {} as Record<MyObservationsSort, ObservationsSortOption>,
-  );
+  ), [observationsSortLabels] );
 
   const renderTaxaItem = useCallback( ( { item: speciesCount }: TaxaFlashListRenderItemProps ) => {
     const taxonId = speciesCount.taxon.id;

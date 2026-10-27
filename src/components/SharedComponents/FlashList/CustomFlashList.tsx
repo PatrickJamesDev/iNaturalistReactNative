@@ -3,6 +3,7 @@ import { FlashList } from "@shopify/flash-list";
 import React, {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
 } from "react";
 import type { NativeScrollEvent, NativeSyntheticEvent, ViewabilityConfig } from "react-native";
@@ -13,6 +14,10 @@ const defaultViewabilityConfig: ViewabilityConfig = {
   viewAreaCoveragePercentThreshold: 10,
   waitForInteraction: false,
 };
+
+// Fixes MOB-1464 where successful upload creates reordering issues and sometimes gaps
+// https://shopify.github.io/flash-list/docs/known-issues#3-data-re-ordering-can-cause-items-to-move
+const MAINTAIN_VISIBLE_CONTENT_POSITION = { disabled: true };
 
 const CustomFlashList = <T, >( props: FlashListProps<T> & { ref?: React.Ref<FlashListRef<T>>} ) => {
   const isFirstRender = useRef( true );
@@ -155,10 +160,12 @@ const CustomFlashList = <T, >( props: FlashListProps<T> & { ref?: React.Ref<Flas
     };
   } );
 
-  const viewabilityConfig = {
+  // A new config object on every render makes FlashList rebuild its viewability helper, which
+  // can interrupt the callbacks that drive pagination and prefetching.
+  const viewabilityConfig = useMemo( ( ) => ( {
     ...defaultViewabilityConfig,
     ...props.viewabilityConfig,
-  };
+  } ), [props.viewabilityConfig] );
 
   return (
     <FlashList
@@ -171,9 +178,7 @@ const CustomFlashList = <T, >( props: FlashListProps<T> & { ref?: React.Ref<Flas
       onScrollEndDrag={handleScrollEndDrag}
       onMomentumScrollEnd={handleMomentumScrollEnd}
       viewabilityConfig={viewabilityConfig}
-      // Fixes MOB-1464 where successful upload creates reordering issues and sometimes gaps
-      // https://shopify.github.io/flash-list/docs/known-issues#3-data-re-ordering-can-cause-items-to-move
-      maintainVisibleContentPosition={{ disabled: true }}
+      maintainVisibleContentPosition={MAINTAIN_VISIBLE_CONTENT_POSITION}
       // eslint-disable-next-line react/jsx-props-no-spreading
       {...otherProps}
     />

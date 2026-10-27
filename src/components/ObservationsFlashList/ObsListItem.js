@@ -56,7 +56,7 @@ const ObsListItem = ( {
   isSimpleObsStatus,
 }: Props ): Node => {
   const { t } = useTranslation();
-  const uploadStatus = useStore( state => state.uploadStatus );
+  const uploadInProgress = useStore( state => state.uploadStatus === UPLOAD_IN_PROGRESS );
   const { isDebug } = useDebugMode( );
   const showUploadErrorMessage = isDebug
     && observation.uploadErrorMessage;
@@ -166,7 +166,7 @@ const ObsListItem = ( {
           // when the children change
           "w-[51px]",
           "h-[65px]",
-          { "justify-center": uploadStatus === UPLOAD_IN_PROGRESS },
+          { "justify-center": uploadInProgress },
         )}
       >
         {!hideObsUploadStatus && (
@@ -186,4 +186,4 @@ const ObsListItem = ( {
   );
 };
 
-export default ObsListItem;
+export default React.memo( ObsListItem );

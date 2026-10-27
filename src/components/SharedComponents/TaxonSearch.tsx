@@ -93,12 +93,13 @@ const TaxonSearch = ( {
   ), [query.length, isLoading] );
 
   // Make sure all of the results can be scrolled to even with the keyboard
-  // up
-  const footerComponent = ( ) => (
+  // up. As an element rather than a new function each render, so FlatList
+  // doesn't remount the footer on every keystroke.
+  const footerComponent = useMemo( ( ) => (
     keyboardShown
       ? <View style={{ paddingBottom: paddingBottom + keyboardHeight }} />
       : <View style={{ paddingBottom }} />
-  );
+  ), [keyboardHeight, keyboardShown, paddingBottom] );
 
   return (
     <ScreenShell>

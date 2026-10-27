@@ -2,6 +2,7 @@ import { focusManager } from "@tanstack/react-query";
 import useDeviceStorageFull from "components/Camera/hooks/useDeviceStorageFull";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
+import { flushPersistedStoreWrites } from "stores/useStore";
 
 const AppStateListener = ( ) => {
   const { deviceStorageFull, showStorageFullAlert } = useDeviceStorageFull( );
@@ -17,6 +18,10 @@ const AppStateListener = ( ) => {
         }
 
         focusManager.setFocused( true );
+      } else {
+        focusManager.setFocused( false );
+        // Going to the background: don't leave debounced preference writes unsaved
+        flushPersistedStoreWrites( );
       }
     } );
 

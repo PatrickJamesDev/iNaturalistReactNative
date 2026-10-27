@@ -61,12 +61,17 @@ export const predictOffline = async ( {
   const formatPrediction = ( prediction: Prediction ): UseSuggestionsOfflineSuggestion => {
     // The "lowest" ancestor_id that matches an iconic taxon
     // is the iconic taxon of this prediction.
-    const iconicTaxonId = prediction.ancestor_ids
-    // Need to reverse so we find the most specific iconic taxon first as an ancestor_ids is
-    // a list of ancestor ids from tip to root of taxonomy
-    // e.g. Aves is included in Animalia
-      .reverse()
-      .find( id => id in iconicTaxaLookup );
+    // Need to search from the tip so we find the most specific iconic taxon first: ancestor_ids
+    // runs from tip to root, so Aves is found before Animalia. Iterate backwards instead of
+    // calling reverse(), which mutated the prediction object we were given.
+    let iconicTaxonId;
+    for ( let i = prediction.ancestor_ids.length - 1; i >= 0; i -= 1 ) {
+      const ancestorId = prediction.ancestor_ids[i];
+      if ( ancestorId in iconicTaxaLookup ) {
+        iconicTaxonId = ancestorId;
+        break;
+      }
+    }
     const id = prediction.taxon_id;
 
     return {

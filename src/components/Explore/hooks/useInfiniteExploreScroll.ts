@@ -92,7 +92,10 @@ const useInfiniteExploreScroll = (
 
   const pages = data?.pages as ApiObservationsSearchResponse[] | undefined;
 
-  const observations: ApiObservation[] = flatten( pages?.map( r => r.results ) ) || [];
+  const observations: ApiObservation[] = useMemo(
+    ( ) => flatten( pages?.map( r => r.results ) ) || [],
+    [pages],
+  );
   let totalResults: number | null | undefined = pages?.[0]?.total_results;
 
   if ( totalResults !== 0 && !totalResults ) {

@@ -3,7 +3,7 @@ import MediaViewerModal from "components/MediaViewer/MediaViewerModal";
 import { ActivityIndicator, INatIconButton } from "components/SharedComponents";
 import { ImageBackground, Pressable, View } from "components/styledComponents";
 import React, {
-  useCallback, useState,
+  useCallback, useMemo, useState,
 } from "react";
 import {
   FlatList,
@@ -202,9 +202,11 @@ const PhotoCarousel = ( {
     viewPhotoAtIndex,
   ] );
 
+  const photoPreviewsData = useMemo( ( ) => [...photoUris], [photoUris] );
   const photoPreviewsList = (
     <FlatList
-      data={[...photoUris]}
+      data={photoPreviewsData}
+      keyExtractor={( uri, index ) => `${uri}-${index}`}
       renderItem={renderPhotoOrEvidenceButton}
       horizontal={!isTablet || !isLandscapeMode}
       ListEmptyComponent={takingPhoto

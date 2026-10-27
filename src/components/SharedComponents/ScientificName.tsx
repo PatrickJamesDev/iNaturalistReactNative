@@ -1,6 +1,5 @@
 import classNames from "classnames";
 import { Body3 } from "components/SharedComponents";
-import random from "lodash/random";
 import React from "react";
 import type { TextProps } from "react-native";
 import Taxon from "realmModels/Taxon";
@@ -48,11 +47,14 @@ const ScientificName = ( {
       ? piece + spaceChar
       : piece;
     const FontComponent = fontComponent || Body3;
+    // Include the position so repeated name pieces (e.g. "Bison bison bison") keep
+    // stable, unique keys without regenerating a random key on every render.
+    const pieceKey = `DisplayTaxonName-${keyBase}-${taxonId}-${rankLevel}-${index}-${piece}`;
 
     return (
       <FontComponent
         maxFontSizeMultiplier={maxFontSizeMultiplier}
-        key={`DisplayTaxonName-${keyBase}-${taxonId}-${rankLevel}-${piece}-${random( 0, 10000 )}`}
+        key={pieceKey}
         className={classNames(
           "font-normal",
           textClassName,
@@ -67,7 +69,7 @@ const ScientificName = ( {
     );
   } );
 
-  if ( rank && rankLevel && rankLevel > Taxon.SPECIES_LEVEL ) {
+  if ( rank && rankLevel && rankLevel > Taxon.SPECIES_LEVEL && scientificNameArray ) {
     scientificNameArray.unshift( " " );
     scientificNameArray.unshift( translatedRank( rank, t ) );
   }

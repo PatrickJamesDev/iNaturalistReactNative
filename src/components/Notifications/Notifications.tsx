@@ -4,7 +4,8 @@ import { View } from "components/styledComponents";
 import { RealmContext } from "providers/contexts";
 import React, { useState } from "react";
 import { EventRegister } from "react-native-event-listeners";
-import { useCurrentUser, useLayoutPrefs, useTranslation } from "sharedHooks";
+import { useCurrentUser, useTranslation } from "sharedHooks";
+import useStore from "stores/useStore";
 
 import NotificationsContainer from "./NotificationsContainer";
 import NotificationsTab, {
@@ -21,7 +22,7 @@ const FOLLOWING_TAB_PARAMS = { observations_by: "following" } as const;
 const Notifications = ( ) => {
   const [activeTab, setActiveTab] = useState<typeof OWNER_TAB | typeof OTHER_TAB>( OWNER_TAB );
   const { t } = useTranslation();
-  const { isDefaultMode } = useLayoutPrefs( );
+  const isDefaultMode = useStore( state => state.layout.isDefaultMode );
   const currentUser = useCurrentUser( );
 
   const realm = useRealm();

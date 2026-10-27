@@ -43,63 +43,65 @@ const UserListItem = ( {
   const { t } = useTranslation( );
   const user = item?.user;
 
-  const UserListItemContainer = pressable
-    ? ( { children } ) => (
-      <Pressable
-        accessibilityRole={
-          onPress
-            ? "button"
-            : "link"
-        }
-        className="flex-row items-center mx-3 my-2"
-        testID={`UserProfile.${user?.id}`}
-        onPress={onPress}
-        accessibilityLabel={accessibilityLabelProp || t( "Navigates-to-user-profile" )}
-        accessibilityState={{ disabled: false }}
-      >
-        { children }
-      </Pressable>
-    )
-    : ( { children } ) => (
+  // Don't define the wrapper as a component inside render: a new component type each render
+  // makes React unmount and remount the whole row instead of updating it.
+  const content = (
+    <View className="flex-row items-center w-5/6">
+      {user?.icon_url
+        ? (
+          <UserIcon
+            uri={User.uri( user )}
+            medium={iconVariant === "medium"}
+          />
+        )
+        : (
+          <INatIcon
+            name="person"
+            size={ICON_VARIANT_SIZE[iconVariant]}
+          />
+        )}
+      <View className="ml-3 shrink">
+        {user?.login && (
+          <Body1
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {user?.login}
+          </Body1>
+        )}
+        {!!countText && (
+          <List2 className="mt-1" maxFontSizeMultiplier={1.5}>
+            {countText}
+          </List2>
+        )}
+      </View>
+    </View>
+  );
+
+  if ( !pressable ) {
+    return (
       <View className="flex-row items-center" testID={`UserProfile.${user?.id}`}>
-        { children }
+        {content}
       </View>
     );
+  }
 
   return (
-    <UserListItemContainer>
-      <View className="flex-row items-center w-5/6">
-        {user?.icon_url
-          ? (
-            <UserIcon
-              uri={User.uri( user )}
-              medium={iconVariant === "medium"}
-            />
-          )
-          : (
-            <INatIcon
-              name="person"
-              size={ICON_VARIANT_SIZE[iconVariant]}
-            />
-          )}
-        <View className="ml-3 shrink">
-          {user?.login && (
-            <Body1
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {user?.login}
-            </Body1>
-          )}
-          {!!countText && (
-            <List2 className="mt-1" maxFontSizeMultiplier={1.5}>
-              {countText}
-            </List2>
-          )}
-        </View>
-      </View>
-    </UserListItemContainer>
+    <Pressable
+      accessibilityRole={
+        onPress
+          ? "button"
+          : "link"
+      }
+      className="flex-row items-center mx-3 my-2"
+      testID={`UserProfile.${user?.id}`}
+      onPress={onPress}
+      accessibilityLabel={accessibilityLabelProp || t( "Navigates-to-user-profile" )}
+      accessibilityState={{ disabled: false }}
+    >
+      {content}
+    </Pressable>
   );
 };
 
-export default UserListItem;
+export default React.memo( UserListItem );

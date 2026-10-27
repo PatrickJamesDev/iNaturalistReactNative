@@ -1,11 +1,10 @@
-import { useNetInfo } from "@react-native-community/netinfo";
 import { useNavigation } from "@react-navigation/native";
 import ObsPressable from "components/ObservationsFlashList/ObsPressable";
 import React from "react";
 import { Alert } from "react-native";
 import type { UserPojo } from "realmModels/User";
 import {
-  useLayoutPrefs, useListItemObservation, useNavigateToObsEdit, useTranslation,
+  useIsConnected, useListItemObservation, useNavigateToObsEdit, useTranslation,
 } from "sharedHooks";
 import { UPLOAD_PENDING } from "stores/createUploadObservationsSlice";
 import useStore from "stores/useStore";
@@ -30,8 +29,8 @@ const SmallGridObsItemContainer = ( {
   width,
 }: Props ) => {
   const { t } = useTranslation( );
-  const { isDefaultMode } = useLayoutPrefs( );
-  const { isConnected } = useNetInfo( );
+  const isDefaultMode = useStore( state => state.layout.isDefaultMode );
+  const isConnected = useIsConnected( );
   const navigation = useNavigation( );
   const navigateToObsEdit = useNavigateToObsEdit( );
 

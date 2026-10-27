@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import useTranslation from "sharedHooks/useTranslation";
 import type { ObservationOrderBy, SortDirection } from "types/sorting";
 
@@ -74,7 +75,7 @@ export function observationSortToRealmSort( sort: MyObservationsSort ): Observat
 
 export function useObservationsSortLabels( ): Record<OBSERVATIONS_SORT, ObservationSortLabels> {
   const { t } = useTranslation( );
-  return {
+  return useMemo( ( ) => ( {
     [OBSERVATIONS_SORT.DATE_UPLOADED_NEWEST]: {
       label: t( "Date-Added-Newest-Default" ),
       text: t( "Observations-added-recently-appear-first" ),
@@ -95,5 +96,5 @@ export function useObservationsSortLabels( ): Record<OBSERVATIONS_SORT, Observat
       label: t( "Most-faved" ),
       text: t( "Observations-with-the-most-faves-appear-first" ),
     },
-  };
+  } ), [t] );
 }

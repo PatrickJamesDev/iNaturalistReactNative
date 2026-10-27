@@ -97,4 +97,4 @@ const ObsGridItem = ( {
   );
 };
 
-export default ObsGridItem;
+export default React.memo( ObsGridItem );

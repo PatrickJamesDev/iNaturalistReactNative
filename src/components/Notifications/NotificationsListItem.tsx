@@ -3,16 +3,16 @@ import classnames from "classnames";
 import ObsNotification from "components/Notifications/ObsNotification";
 import { Pressable, View } from "components/styledComponents";
 import React from "react";
-import { useLayoutPrefs } from "sharedHooks";
 import type { Notification } from "sharedHooks/useInfiniteNotificationsScroll";
 import { OBS_DETAILS_TAB } from "stores/createLayoutSlice";
+import useStore from "stores/useStore";
 
 interface Props {
   notification: Notification;
 }
 
 const NotificationsListItem = ( { notification }: Props ) => {
-  const { setObsDetailsTab } = useLayoutPrefs( );
+  const setObsDetailsTab = useStore( state => state.setObsDetailsTab );
   const navigation = useNavigation( );
   const viewedStatus = notification.viewed;
 
@@ -50,4 +50,4 @@ const NotificationsListItem = ( { notification }: Props ) => {
   );
 };
 
-export default NotificationsListItem;
+export default React.memo( NotificationsListItem );

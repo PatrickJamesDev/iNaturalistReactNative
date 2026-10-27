@@ -84,9 +84,13 @@ const DisplayTaxonName = ( {
     );
   }
 
-  const taxonPojo = typeof ( taxon.toJSON ) === "function"
-    ? taxon.toJSON( )
-    : taxon;
+  // Realm objects are observable proxies: converting one to a POJO with toJSON()
+  // walks every property and allocates a copy, and this component renders once per
+  // list cell. Realm taxa always carry `rank`, so only call toJSON when we actually
+  // need to synthesize it from `rank_level` (as we do for API taxa from AI camera).
+  const taxonPojo = taxon.rank || typeof ( taxon.toJSON ) !== "function"
+    ? taxon
+    : taxon.toJSON( );
 
   // this is mostly for the AICamera, but might be helpful to display elsewhere
   const processedTaxon = taxonPojo?.rank_level && !taxonPojo?.rank

@@ -170,9 +170,23 @@ class Observation extends Realm.Object {
   static upsertRemoteObservations( remoteObservations, realm, options = {} ) {
     if ( !remoteObservations ) return;
     if ( remoteObservations.length === 0 ) return;
-    const obsToUpsert = options.force
+    const candidates = options.force
       ? remoteObservations
       : remoteObservations.filter( obs => !Observation.isUnsyncedObservation( realm, obs ) );
+    // Every sync/fetch returns full objects for the same 20-50 observations, but most
+    // of them haven't changed server-side. Writing them anyway opens a Realm write
+    // transaction, resets _synced_at, and emits change notifications that re-render every
+    // visible tile. Skip objects whose server updated_at already matches the local copy.
+    const obsToUpsert = candidates.filter( remoteObservation => {
+      if ( options.force ) return true;
+      const existingObs = realm.objectForPrimaryKey( "Observation", remoteObservation.uuid );
+      if ( !existingObs || !existingObs._synced_at ) return true;
+      if ( !remoteObservation.updated_at || !existingObs.updated_at ) return true;
+      const remoteUpdatedAt = new Date( remoteObservation.updated_at ).getTime();
+      return Number.isNaN( remoteUpdatedAt )
+        || existingObs.updated_at.getTime() !== remoteUpdatedAt;
+    } );
+    if ( obsToUpsert.length === 0 ) return;
     // const msg = obsToUpsert.map( remoteObservation => {
     //   const obsPhotoUUIDs = remoteObservation.observation_photos?.map( op => op.uuid );
     //   return `obs ${remoteObservation.uuid}, ops: ${obsPhotoUUIDs}`;
@@ -651,13 +665,13 @@ class Observation extends Realm.Object {
 
   needsSync( ) {
     const obsPhotosNeedSync = this.observationPhotos
-      .filter( obsPhoto => obsPhoto.needsSync( ) ).length > 0;
+      .some( obsPhoto => obsPhoto.needsSync( ) );
     const obsSoundsNeedSync = this.observationSounds
-      .filter( obsSound => obsSound.needsSync( ) ).length > 0;
+      .some( obsSound => obsSound.needsSync( ) );
     const projectObsNeedSync = this.projectObservations
-      .filter( po => po.needsSync( ) ).length > 0;
+      .some( po => po.needsSync( ) );
     const obsFieldValuesNeedSync = this.observationFieldValues
-      .filter( ofv => ofv.needsSync( ) ).length > 0;
+      .some( ofv => ofv.needsSync( ) );
     return !this._synced_at
       || this._synced_at <= this._updated_at
       || obsPhotosNeedSync

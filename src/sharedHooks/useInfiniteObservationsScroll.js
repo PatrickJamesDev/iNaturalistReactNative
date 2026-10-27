@@ -84,6 +84,11 @@ const useInfiniteObservationsScroll = ( {
     }
   }, [realm, newlyFetchedObservations] );
 
+  const observations = useMemo(
+    ( ) => flatten( data?.pages?.map( page => page.results ) ),
+    [data?.pages],
+  );
+
   const hasLocalObservations = realm?.objects( "Observation" )?.length > 0;
 
   const fetchFromLastObservation = useCallback( async lastObservationId => {
@@ -93,7 +98,7 @@ const useInfiniteObservationsScroll = ( {
   }, [fetchNextPage] );
 
   const infiniteScrollObject = {
-    observations: flatten( data?.pages?.map( page => page.results ) ),
+    observations,
     status,
     firstObservationsInRealm: hasLocalObservations,
     totalResults: data?.pages?.[0]?.total_results,
