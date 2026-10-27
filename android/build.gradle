@@ -59,3 +59,28 @@ subprojects { sub ->
         }
     }
 }
+
+// On Windows, CMake/Ninja output for libraries in node_modules lands in
+// android/.cxx beneath the library, and those paths can grow long enough that
+// Ninja keeps regenerating build.ninja ("still dirty after 100 tries"). Keep
+// native staging directories in a short, per-checkout folder under the user's
+// home directory instead. The hash keeps separate checkouts from sharing
+// CMake caches.
+if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+    def stagingDigest = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(rootProject.projectDir.absolutePath.toLowerCase(java.util.Locale.ROOT).getBytes("UTF-8"))
+    def stagingKey = java.util.HexFormat.of().formatHex(stagingDigest).substring(0, 12)
+    def stagingRoot = new File(System.getProperty("user.home"), ".inat-android-cxx/${stagingKey}")
+
+    subprojects { sub ->
+        ["com.android.application", "com.android.library"].each { pluginId ->
+            sub.plugins.withId(pluginId) {
+                def cmake = sub.android.externalNativeBuild.cmake
+                if (cmake != null) {
+                    def projectKey = sub.path.replaceAll("[^A-Za-z0-9._-]", "_")
+                    cmake.buildStagingDirectory = new File(stagingRoot, projectKey)
+                }
+            }
+        }
+    }
+}

@@ -1,4 +1,6 @@
+import crypto from "crypto";
 import fs from "fs";
+import os from "os";
 import path from "path";
 
 const DEFAULT_MAX_PATH_LENGTH = 80;
@@ -92,7 +94,18 @@ function addDirectory( directories, directory ) {
   }
 }
 
-function findCxxDirectories( root ) {
+function getWindowsStagingRoot( root ) {
+  if ( process.platform !== "win32" ) {
+    return null;
+  }
+  // Must match the staging key in android/build.gradle.
+  const digest = crypto.createHash( "sha256" )
+    .update( path.resolve( root ).toLowerCase(), "utf8" )
+    .digest( "hex" );
+  return path.join( os.homedir(), ".inat-android-cxx", digest.slice( 0, 12 ) );
+}
+
+function findCxxDirectories( root, windowsStagingRoot ) {
   const directories = new Set();
   const nodeModules = path.join( root, "node_modules" );
   for ( const packageDirectory of listDirectories( nodeModules ) ) {
@@ -114,6 +127,11 @@ function findCxxDirectories( root ) {
   }
   addDirectory( directories, path.join( root, "android", "app", ".cxx" ) );
   addDirectory( directories, path.join( root, "android", ".cxx" ) );
+  if ( windowsStagingRoot ) {
+    for ( const moduleDirectory of listDirectories( windowsStagingRoot ) ) {
+      addDirectory( directories, moduleDirectory );
+    }
+  }
   return Array.from( directories );
 }
 
@@ -251,7 +269,8 @@ if ( logicalRoot.length > maxPathLength ) {
   printLongPathInstructions( logicalRoot );
 }
 
-const cxxDirectories = findCxxDirectories( logicalRoot );
+const windowsStagingRoot = getWindowsStagingRoot( logicalRoot );
+const cxxDirectories = findCxxDirectories( logicalRoot, windowsStagingRoot );
 const staleReasons = getStaleReasons( logicalRoot );
 const staleCxxDirectories = [];
 
@@ -296,6 +315,9 @@ if ( needsClean ) {
   for ( const cxxDirectory of directoriesToRemove ) {
     removeTree( cxxDirectory );
     removeTree( path.join( path.dirname( cxxDirectory ), "build" ) );
+  }
+  if ( windowsStagingRoot ) {
+    removeTree( windowsStagingRoot );
   }
 }
 
