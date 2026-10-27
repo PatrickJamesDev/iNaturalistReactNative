@@ -188,6 +188,9 @@ if errorlevel 1 (
 )
 
 set "JAVA_CMD=java"
+rem JAVA_HOME is sometimes set with surrounding quotes or a trailing backslash.
+if defined JAVA_HOME set "JAVA_HOME=%JAVA_HOME:"=%"
+if defined JAVA_HOME if "!JAVA_HOME:~-1!"=="\" set "JAVA_HOME=!JAVA_HOME:~0,-1!"
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "JAVA_CMD=%JAVA_HOME%\bin\java.exe"
 "%JAVA_CMD%" -version >nul 2>nul
 if errorlevel 1 (
@@ -205,7 +208,12 @@ if errorlevel 1 (
   echo ERROR: Java was not found. Install JDK 17 and set JAVA_HOME.
   goto fail
 )
-for /f "tokens=3" %%v in ('"%JAVA_CMD%" -version 2^>^&1 ^| findstr /i "version"') do set "JAVA_VER=%%~v"
+rem Do not place "%JAVA_CMD%" inside for /f: cmd /c strips the outer quotes when
+rem the command starts with a quoted path and breaks paths that contain spaces.
+set "JAVA_VER_FILE=%TEMP%\inat-java-version.txt"
+"%JAVA_CMD%" -version >"%JAVA_VER_FILE%" 2>&1
+for /f "tokens=3" %%v in ('findstr /i "version" "%JAVA_VER_FILE%"') do if not defined JAVA_VER set "JAVA_VER=%%~v"
+del "%JAVA_VER_FILE%" >nul 2>nul
 if not defined JAVA_VER (
   echo ERROR: Could not determine the Java version.
   goto fail
@@ -220,9 +228,12 @@ if not "!JAVA_MAJOR!"=="17" (
   echo WARNING: Java !JAVA_VER! detected. CI uses JDK 17; use JDK 17 if Gradle fails.
 )
 
+rem Environment variables are sometimes set with surrounding quotes.
+if defined ANDROID_HOME set "ANDROID_HOME=%ANDROID_HOME:"=%"
+if defined ANDROID_SDK_ROOT set "ANDROID_SDK_ROOT=%ANDROID_SDK_ROOT:"=%"
 set "SDK_DIR=%ANDROID_HOME%"
 if not defined SDK_DIR set "SDK_DIR=%ANDROID_SDK_ROOT%"
-if not defined SDK_DIR set "SDK_DIR=%LOCALAPPDATA%\Android\Sdk"
+if not defined SDK_DIR if exist "%LOCALAPPDATA%\Android\Sdk" set "SDK_DIR=%LOCALAPPDATA%\Android\Sdk"
 if not exist "%SDK_DIR%" (
   echo ERROR: Android SDK not found.
   echo        Set ANDROID_HOME or install the SDK via Android Studio.
