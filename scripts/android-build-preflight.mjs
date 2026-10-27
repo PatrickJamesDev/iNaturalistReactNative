@@ -105,6 +105,131 @@ function getWindowsStagingRoot( root ) {
   return path.join( os.homedir(), ".inat-android-cxx", digest.slice( 0, 12 ) );
 }
 
+function getAndroidSdkRoot( root ) {
+  const fromEnvironment = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+  if ( fromEnvironment ) {
+    return fromEnvironment;
+  }
+  try {
+    const localProperties = fs.readFileSync(
+      path.join( root, "android", "local.properties" ),
+      "utf8",
+    );
+    const match = localProperties.match( /^sdk\.dir=(.*)$/m );
+    if ( match ) {
+      return match[1].trim()
+        .replace( /\\:/g, ":" )
+        .replace( /\\\\/g, "\\" );
+    }
+  } catch {
+    // local.properties is optional.
+  }
+  return null;
+}
+
+function addNativePackageRoots( roots, packageDirectory ) {
+  for ( const directoryName of ["android", "cpp", "common", "Common", "shared", "src", "jni"] ) {
+    addDirectory( roots, path.join( packageDirectory, directoryName ) );
+  }
+}
+
+function collectNativeRoots( root ) {
+  const roots = new Set();
+  addDirectory( roots, path.join( root, "android" ) );
+
+  const nodeModules = path.join( root, "node_modules" );
+  for ( const packageDirectory of listDirectories( nodeModules ) ) {
+    if ( path.basename( packageDirectory ).startsWith( "@" ) ) {
+      for ( const scopedDirectory of listDirectories( packageDirectory ) ) {
+        addNativePackageRoots( roots, scopedDirectory );
+      }
+    } else {
+      addNativePackageRoots( roots, packageDirectory );
+    }
+  }
+
+  const sdkRoot = getAndroidSdkRoot( root );
+  if ( sdkRoot ) {
+    addDirectory( roots, path.join( sdkRoot, "cmake" ) );
+    for ( const ndkDirectory of listDirectories( path.join( sdkRoot, "ndk" ) ) ) {
+      addDirectory( roots, path.join( ndkDirectory, "build", "cmake" ) );
+      addDirectory(
+        roots,
+        path.join(
+          ndkDirectory,
+          "toolchains",
+          "llvm",
+          "prebuilt",
+          "windows-x86_64",
+          "sysroot",
+          "usr",
+          "lib",
+          "cmake",
+        ),
+      );
+    }
+  }
+  return Array.from( roots );
+}
+
+function isCMakeFile( fileName ) {
+  return fileName === "CMakeLists.txt" || fileName.toLowerCase().endsWith( ".cmake" );
+}
+
+function normalizeFutureCMakeTimestamps( root ) {
+  if ( process.platform !== "win32" ) {
+    return 0;
+  }
+  const now = Date.now();
+  const futureThreshold = now + 5000;
+  const resetTime = now / 1000 - 1;
+  const skippedDirectories = new Set( [
+    ".cxx",
+    ".git",
+    ".gradle",
+    "__tests__",
+    "build",
+    "dist",
+    "e2e",
+    "ios",
+    "macos",
+    "node_modules",
+    "Pods",
+    "windows",
+  ] );
+  let fixed = 0;
+
+  const pendingDirectories = collectNativeRoots( root );
+  while ( pendingDirectories.length > 0 ) {
+    const directory = pendingDirectories.pop();
+    let entries = [];
+    try {
+      entries = fs.readdirSync( directory, { withFileTypes: true } );
+    } catch {
+      entries = [];
+    }
+    for ( const entry of entries ) {
+      const entryPath = path.join( directory, entry.name );
+      if ( entry.isDirectory() ) {
+        if ( !skippedDirectories.has( entry.name ) ) {
+          pendingDirectories.push( entryPath );
+        }
+      } else if ( isCMakeFile( entry.name ) ) {
+        try {
+          const stats = fs.statSync( entryPath );
+          if ( stats.mtimeMs > futureThreshold ) {
+            fs.utimesSync( entryPath, resetTime, resetTime );
+            fixed += 1;
+          }
+        } catch {
+          // Ignore files we cannot inspect or update.
+        }
+      }
+    }
+  }
+  return fixed;
+}
+
 function findCxxDirectories( root, windowsStagingRoot ) {
   const directories = new Set();
   const nodeModules = path.join( root, "node_modules" );
@@ -267,6 +392,11 @@ if ( logicalRoot.length > maxPathLength ) {
   console.log( "         Android native builds can fail when generated object paths exceed" );
   console.log( "         250 characters. If the build fails, move it to a short real folder:" );
   printLongPathInstructions( logicalRoot );
+}
+
+const fixedFutureTimestamps = normalizeFutureCMakeTimestamps( logicalRoot );
+if ( fixedFutureTimestamps > 0 ) {
+  console.log( `  Reset future timestamps on ${fixedFutureTimestamps} CMake file(s).` );
 }
 
 const windowsStagingRoot = getWindowsStagingRoot( logicalRoot );
