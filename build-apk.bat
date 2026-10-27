@@ -160,7 +160,7 @@ rem Toolchain checks
 rem ---------------------------------------------------------------
 where node >nul 2>nul
 if errorlevel 1 (
-  echo ERROR: node was not found on PATH. Install Node 24 (see .nvmrc) and retry.
+  echo ERROR: node was not found on PATH. Install Node 24 ^(see .nvmrc^) and retry.
   goto fail
 )
 for /f "tokens=*" %%v in ('node -v') do set "NODE_VER=%%v"
