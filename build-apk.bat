@@ -336,6 +336,14 @@ if "%FORCE_DEPS%"=="1" (
 )
 
 rem ---------------------------------------------------------------
+rem Native build preflight
+rem ---------------------------------------------------------------
+set "PREFLIGHT_ARGS="
+if "%DO_CLEAN%"=="1" set "PREFLIGHT_ARGS=-Clean"
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\android-build-preflight.ps1" -Root "%ROOT%" %PREFLIGHT_ARGS%
+if errorlevel 1 goto fail
+
+rem ---------------------------------------------------------------
 rem Build
 rem ---------------------------------------------------------------
 if "%DO_CLEAN%"=="1" (
@@ -352,7 +360,14 @@ pushd android
 call gradlew.bat %GRADLE_TASK% -PreactNativeArchitectures=%ARCHS% --console=plain
 set "GRADLE_EXIT=%ERRORLEVEL%"
 popd
-if not "%GRADLE_EXIT%"=="0" goto fail
+if not "%GRADLE_EXIT%"=="0" (
+  echo.
+  echo HINT: If the build failed while compiling native code, stale caches copied
+  echo       from another folder or a long project path are likely. Run:
+  echo         build-apk.bat clean
+  echo       or copy the repo to a short real folder such as C:\src\inat.
+  goto fail
+)
 
 if not exist "%APK_PATH%" (
   echo ERROR: Expected APK not found at %APK_PATH%
@@ -412,7 +427,7 @@ echo   all                 armeabi-v7a,arm64-v8a,x86,x86_64
 echo   --arch ^<abi^>        Any valid Gradle ABI list
 echo.
 echo Options:
-echo   clean               Run gradlew clean first
+echo   clean               Remove Gradle and native build caches, then rebuild
 echo   deps                Force npm ci
 echo   install             Install on the connected device with adb
 echo   help                Show this help
