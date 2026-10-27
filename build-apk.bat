@@ -365,7 +365,7 @@ if not "%GRADLE_EXIT%"=="0" (
   echo HINT: If the build failed while compiling native code, stale caches copied
   echo       from another folder or a long project path are likely. Run:
   echo         build-apk.bat clean
-  echo       or copy the repo to a short real folder such as C:\src\inat.
+  echo       or move the repo to a short real folder such as C:\inat.
   goto fail
 )
 
@@ -440,7 +440,7 @@ echo   build-apk.bat release all clean
 echo.
 echo Requirements: JDK 17, Node 20+ ^(24 recommended^), Android SDK
 echo   platform 36, build-tools 36.0.0, NDK 27.1.12297006.
-echo Keep the repo in a short path such as C:\src\inat to avoid Windows path limits.
+echo Keep the repo in a short path such as C:\inat to avoid Windows path limits.
 echo.
 exit /b 0
 

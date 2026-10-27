@@ -31,12 +31,15 @@ buildscript {
 // On Windows, CMake/Ninja output for libraries in node_modules lands in
 // android/.cxx beneath the library, and those paths can grow long enough that
 // Ninja keeps regenerating build.ninja ("still dirty after 100 tries"). Keep
-// native staging directories in a short, per-checkout folder under the user's
+// those staging directories in a short, per-checkout folder under the user's
 // home directory instead. The hash keeps separate checkouts from sharing
 // CMake caches.
 //
-// This must be registered before the React root plugin below evaluates the app,
-// because AGP locks buildStagingDirectory as soon as its variants are created.
+// The app's autolinked codegen flattens node_modules source paths into object
+// filenames, so its staging stays at the repo-root .cxx; that gives those
+// object paths as much room as possible under Windows' 260-character limit. Both
+// hooks must be registered before the React root plugin below evaluates the
+// app, because AGP locks buildStagingDirectory as soon as variants are created.
 if (System.getProperty("os.name").toLowerCase().contains("windows")) {
     def stagingDigest = java.security.MessageDigest.getInstance("SHA-256")
         .digest(rootProject.projectDir.absolutePath.toLowerCase(java.util.Locale.ROOT).getBytes("UTF-8"))
@@ -44,6 +47,12 @@ if (System.getProperty("os.name").toLowerCase().contains("windows")) {
     def stagingRoot = new File(System.getProperty("user.home"), ".inat-android-cxx/${stagingKey}")
 
     subprojects { sub ->
+        sub.plugins.withId("com.android.application") {
+            def cmake = sub.android.externalNativeBuild.cmake
+            if (cmake != null) {
+                cmake.buildStagingDirectory = new File(sub.rootProject.rootDir, ".cxx")
+            }
+        }
         sub.plugins.withId("com.android.library") {
             def cmake = sub.android.externalNativeBuild.cmake
             if (cmake != null) {

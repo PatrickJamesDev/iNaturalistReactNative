@@ -4,7 +4,20 @@ import os from "os";
 import path from "path";
 
 const DEFAULT_MAX_PATH_LENGTH = 80;
+const MAX_WINDOWS_ROOT_LENGTH = 9;
 const MAX_CMAKE_CACHE_DEPTH = 6;
+
+function printWindowsShortPathError( root ) {
+  const shortRoot = path.join( path.parse( root ).root, "inat" );
+  console.error( `ERROR: The project path is ${root.length} characters long:` );
+  console.error( `       ${root}` );
+  console.error( "       Android autolinked codegen flattens node_modules source paths into" );
+  console.error( "       object filenames, so Windows cannot build from a long folder name." );
+  console.error( `       Move this folder to a short real path (${shortRoot} is 7 characters):` );
+  console.error( `         move "${root}" "${shortRoot}"` );
+  console.error( `         cd /d "${shortRoot}"` );
+  console.error( "         build-apk.bat clean" );
+}
 
 let rootArg = "";
 let clean = false;
@@ -36,6 +49,11 @@ if ( !rootArg ) {
 const logicalRoot = path.resolve( rootArg );
 if ( !fs.existsSync( logicalRoot ) ) {
   console.error( `ERROR: Project folder not found: ${logicalRoot}` );
+  process.exit( 1 );
+}
+
+if ( process.platform === "win32" && logicalRoot.length > MAX_WINDOWS_ROOT_LENGTH ) {
+  printWindowsShortPathError( logicalRoot );
   process.exit( 1 );
 }
 
@@ -252,6 +270,7 @@ function findCxxDirectories( root, windowsStagingRoot ) {
   }
   addDirectory( directories, path.join( root, "android", "app", ".cxx" ) );
   addDirectory( directories, path.join( root, "android", ".cxx" ) );
+  addDirectory( directories, path.join( root, ".cxx" ) );
   if ( windowsStagingRoot ) {
     for ( const moduleDirectory of listDirectories( windowsStagingRoot ) ) {
       addDirectory( directories, moduleDirectory );
@@ -338,9 +357,10 @@ function removeTree( target ) {
 }
 
 function printLongPathInstructions( root ) {
-  const copyCommand = `robocopy "${root}" "C:\\inat-build" /E /XD node_modules .git dist`;
+  const copyTarget = "C:\\inat";
+  const copyCommand = `robocopy "${root}" "${copyTarget}" /E /XD node_modules .git dist`;
   console.log( `           ${copyCommand}` );
-  console.log( "           cd /d C:\\inat-build" );
+  console.log( `           cd /d ${copyTarget}` );
   console.log( "           build-apk.bat deps" );
 }
 
@@ -349,6 +369,11 @@ try {
   physicalRoot = fs.realpathSync( logicalRoot );
 } catch {
   physicalRoot = logicalRoot;
+}
+
+if ( process.platform === "win32" && physicalRoot.length > MAX_WINDOWS_ROOT_LENGTH ) {
+  printWindowsShortPathError( physicalRoot );
+  process.exit( 1 );
 }
 
 const reparsePoints = [];
