@@ -282,7 +282,7 @@ if not exist ".env.staging" (
 )
 
 if exist "android\app\google-services.json" goto google_services_done
-powershell -NoProfile -Command "$c=Get-Content -Raw 'android\app\google-services.example.json'; $c=$c.Replace('your_project_number','123456789012'); $c=$c.Replace('your_project_id','inaturalist-local'); $c=$c.Replace('your_storage_bucket','inaturalist-local.appspot.com'); $c=$c.Replace('your_mobilesdk_app_id','1:123456789012:android:0123456789abcdef'); $c=$c.Replace('your_package_name','org.inaturalist.iNaturalistMobile'); $c=$c.Replace('your_current_key','AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'); Set-Content -NoNewline 'android\app\google-services.json' $c"
+powershell -NoProfile -Command "$c=Get-Content -Raw 'android\app\google-services.example.json'; $c=$c.Replace('your_project_number','123456789012'); $c=$c.Replace('your_project_id','inaturalist-local'); $c=$c.Replace('your_storage_bucket','inaturalist-local.appspot.com'); $c=$c.Replace('your_mobilesdk_app_id','1:123456789012:android:0123456789abcdef'); $c=$c.Replace('your_package_name','org.inaturalist.iNaturalistMobile'); $c=$c.Replace('your_current_key','AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'); [System.IO.File]::WriteAllText('android\app\google-services.json', $c)"
 if errorlevel 1 (
   echo ERROR: Could not create android\app\google-services.json.
   goto fail
@@ -339,8 +339,8 @@ rem ---------------------------------------------------------------
 rem Native build preflight
 rem ---------------------------------------------------------------
 set "PREFLIGHT_ARGS="
-if "%DO_CLEAN%"=="1" set "PREFLIGHT_ARGS=-Clean"
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\android-build-preflight.ps1" -Root "%ROOT%" %PREFLIGHT_ARGS%
+if "%DO_CLEAN%"=="1" set "PREFLIGHT_ARGS=--clean"
+node "scripts\android-build-preflight.mjs" "%ROOT%" %PREFLIGHT_ARGS%
 if errorlevel 1 goto fail
 
 rem ---------------------------------------------------------------
