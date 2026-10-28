@@ -4,7 +4,7 @@ import {
 import { INatApiError } from "api/error";
 import { deleteRemoteObservation } from "api/observations";
 import { RealmContext } from "providers/contexts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import Observation from "realmModels/Observation";
 import { useAuthenticatedMutation } from "sharedHooks";
 import {
@@ -39,18 +39,20 @@ const useSyncObservations = (
   const resetSyncToolbar = useStore( state => state.resetSyncToolbar );
   const removeFromDeleteQueue = useStore( state => state.removeFromDeleteQueue );
   const autoSyncAbortController = useStore( storeState => storeState.autoSyncAbortController );
-  const [currentDeletionUuid, setCurrentDeletionUuid] = useState( null );
 
   const canSync = loggedIn && isConnected === true;
 
   const realm = useRealm( );
 
   const { mutateAsync: deleteRemoteObservationMutateAsync } = useAuthenticatedMutation(
-    ( params: object, optsWithAuth: object ) => deleteRemoteObservation( params, optsWithAuth ),
+    ( params: { uuid: string }, optsWithAuth: object ) => deleteRemoteObservation(
+      params,
+      optsWithAuth,
+    ),
     {
-      onSuccess: ( ) => {
+      onSuccess: ( _data, variables ) => {
         Observation
-          .deleteLocalObservation( realm, currentDeletionUuid );
+          .deleteLocalObservation( realm, variables.uuid );
         removeFromDeleteQueue( );
       },
       onError: ( deleteObservationError: Error ) => {
@@ -64,7 +66,6 @@ const useSyncObservations = (
     if ( deleteQueue.length === 0 ) { return; }
 
     deleteQueue.forEach( async ( uuid: string, i: number ) => {
-      setCurrentDeletionUuid( uuid );
       const observation = realm.objectForPrimaryKey( "Observation", uuid );
 
       // Mark as pending deletion first instead of immediately deleting
