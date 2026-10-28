@@ -3,7 +3,10 @@ import type {
   GeolocationResponse,
 } from "@react-native-community/geolocation";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useRef, useState } from "react";
+import {
+  useCallback, useEffect, useRef, useState,
+} from "react";
+import { AppState } from "react-native";
 
 // Please don't change this to an aliased path or the e2e mock will not get
 // used in our e2e tests on Github Actions
@@ -32,10 +35,18 @@ const useWatchPosition = ( options: {
   const { shouldFetchLocation } = options;
   const [userLocation, setUserLocation] = useState<UserLocation | null>( null );
   const [isWatching, setIsWatching] = useState( false );
+  const [isAppActive, setIsAppActive] = useState( AppState.currentState === "active" );
   const cancelledRef = useRef( false );
 
+  useEffect( ( ) => {
+    const subscription = AppState.addEventListener( "change", nextAppState => {
+      setIsAppActive( nextAppState === "active" );
+    } );
+    return ( ) => subscription.remove( );
+  }, [] );
+
   useFocusEffect( useCallback( ( ) => {
-    if ( !shouldFetchLocation ) return ( ) => {};
+    if ( !shouldFetchLocation || !isAppActive ) return ( ) => {};
     cancelledRef.current = false;
 
     let id: number | null = null;
@@ -83,7 +94,7 @@ const useWatchPosition = ( options: {
       stop( );
       setUserLocation( null );
     };
-  }, [shouldFetchLocation] ) );
+  }, [isAppActive, shouldFetchLocation] ) );
 
   return { isFetchingLocation: isWatching, userLocation };
 };
