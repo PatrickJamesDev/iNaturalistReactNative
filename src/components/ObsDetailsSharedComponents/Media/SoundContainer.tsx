@@ -95,6 +95,7 @@ const SoundContainer = ( {
 
   const playSound = useCallback( ( position?: number ) => {
     async function playSoundAsync( ) {
+      player.removePlayBackListener( );
       await player.startPlayer( sound.file_url );
       if ( position ) {
         try {
@@ -195,11 +196,20 @@ const SoundContainer = ( {
     stopSound,
   ] );
 
-  // User navigated to a different screen, stop playback. Note that this is
-  // only using the cleanup function of useCallback
+  // User navigated to a different screen, fully stop the native player so a
+  // paused sound cannot leak into the next observation's player on Android.
   useFocusEffect( useCallback( ( ) => async ( ) => {
-    await stopSound( );
-  }, [stopSound] ) );
+    setPlaying( false );
+    player.removePlayBackListener( );
+    try {
+      await player.stopPlayer( );
+    } catch ( stopPlayerError ) {
+      if ( !( stopPlayerError instanceof Error
+        && stopPlayerError.message.match( /Player has already stopped|Player is null/ ) ) ) {
+        throw stopPlayerError;
+      }
+    }
+  }, [player] ) );
 
   // if autoPlay was selected and this is visible, start playback automatically
   useEffect( ( ) => {
