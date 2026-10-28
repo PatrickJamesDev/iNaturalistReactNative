@@ -6,19 +6,18 @@ import type { GroupedPhoto } from "stores/createObservationFlowSlice";
 
 interface Props {
   item: GroupedPhoto;
-  selectedObservations: GroupedPhoto[];
+  isSelected: boolean;
   selectObservationPhotos: ( isSelected: boolean, item: GroupedPhoto ) => void;
   style?: ViewStyle;
 }
 
 const GroupPhotoImage = ( {
   item,
-  selectedObservations,
+  isSelected,
   selectObservationPhotos,
   style,
 }: Props ) => {
   const firstPhoto = item.photos[0];
-  const isSelected = selectedObservations.includes( item );
   const handlePress = ( ) => selectObservationPhotos( isSelected, item );
 
   const source = firstPhoto && { uri: firstPhoto.image.uri };
@@ -42,4 +41,4 @@ const GroupPhotoImage = ( {
   );
 };
 
-export default GroupPhotoImage;
+export default React.memo( GroupPhotoImage );

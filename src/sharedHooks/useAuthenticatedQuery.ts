@@ -1,7 +1,11 @@
 import type { QueryKey, UseQueryOptions } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { getJWT, isLoggedIn } from "components/LoginSignUp/AuthenticationService";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import {
+  getAuthStateSnapshot,
+  subscribeToAuthState,
+} from "sharedHelpers/authState";
 import { handleRetryDelay, reactQueryRetry } from "sharedHelpers/logging";
 
 const LOGGED_IN_UNKNOWN = null;
@@ -26,21 +30,30 @@ const useAuthenticatedQuery = <Response>(
   queryFunction: QueryFunction<Response>,
   queryOptions: AuthenticatedQueryOptions<Response> = {},
 ) => {
-  const [userLoggedIn, setUserLoggedIn] = useState<boolean | null>( LOGGED_IN_UNKNOWN );
+  // Read the shared auth snapshot synchronously. Once any query has checked
+  // auth, later screens mount with the known value and skip the async effect
+  // and extra render they used to do on every navigation.
+  const userLoggedIn = useSyncExternalStore(
+    subscribeToAuthState,
+    getAuthStateSnapshot,
+    getAuthStateSnapshot,
+  );
 
   useEffect( ( ) => {
+    let cancelled = false;
     const checkAuth = async ( ) => {
       try {
-        const result = await isLoggedIn( );
-        setUserLoggedIn( result );
+        await isLoggedIn( );
       } catch ( error ) {
-        console.warn( "Auth check failed:", error );
-        setUserLoggedIn( false );
+        if ( !cancelled ) console.warn( "Auth check failed:", error );
       }
     };
 
-    checkAuth( );
-  }, [] );
+    if ( userLoggedIn === null ) checkAuth( );
+    return ( ) => {
+      cancelled = true;
+    };
+  }, [userLoggedIn] );
 
   // The results will probably be different depending on whether the user is
   // signed in or we wouldn't be using useAuthenticatedQuery in the first

@@ -5,6 +5,7 @@ import { getJWT } from "components/LoginSignUp/AuthenticationService";
 import type Realm from "realm";
 import Project from "realmModels/Project";
 import { log } from "sharedHelpers/logger";
+import { zustandStorage } from "stores/useStore";
 
 import safeRealmWrite from "./safeRealmWrite";
 
@@ -13,6 +14,8 @@ const logger = log.extend( "syncJoinedProjects.ts" );
 const PER_PAGE = 100;
 // Runaway guard, generously above any realistic number of joined projects
 const MAX_PAGES = 100;
+const LAST_SYNC_KEY_PREFIX = "lastJoinedProjectsSyncAt";
+export const JOINED_PROJECTS_SYNC_MAX_AGE_MS = 15 * 60 * 1000;
 
 const deleteNotRemoteProjects = ( remoteProjects: number[], realm: Realm ) => {
   if ( !remoteProjects ) { return; }
@@ -27,10 +30,27 @@ const deleteNotRemoteProjects = ( remoteProjects: number[], realm: Realm ) => {
   }, "removing projects from realm that are not remote" );
 };
 
+interface SyncJoinedProjectsOptions {
+  // Callers on navigation paths can skip a redundant full paginated sync.
+  // Tests and explicit refreshes omit this and always sync.
+  maxAgeMs?: number;
+}
+
 async function syncJoinedProjects(
   realm: Realm,
   currentUserId: number,
+  options: SyncJoinedProjectsOptions = {},
 ): Promise<void> {
+  const { maxAgeMs = 0 } = options;
+  const lastSyncKey = `${LAST_SYNC_KEY_PREFIX}:${currentUserId}`;
+
+  if ( maxAgeMs > 0 ) {
+    const lastSync = Number( zustandStorage.getItem( lastSyncKey ) );
+    if ( lastSync && Date.now( ) - lastSync < maxAgeMs ) {
+      return;
+    }
+  }
+
   try {
     const apiToken = await getJWT( );
     const remoteProjectIds: number[] = [];
@@ -77,6 +97,9 @@ async function syncJoinedProjects(
     // Remove projects that are present locally but no longer in server
     // response, only after every page was fetched successfully
     deleteNotRemoteProjects( remoteProjectIds, realm );
+    if ( maxAgeMs > 0 ) {
+      zustandStorage.setItem( lastSyncKey, Date.now( ) );
+    }
   } catch ( error ) {
     // Both triggers (deferred startup and chooser mount) are fire-and-forget
     // background syncs, so failures must not surface to the user

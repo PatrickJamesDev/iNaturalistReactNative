@@ -137,6 +137,10 @@ const queryClient = new QueryClient( {
   defaultOptions: {
     queries: {
       retry: reactQueryRetry,
+      // The default staleTime of 0 makes every screen remount refetch every
+      // query, which causes repeated network work and loading flashes while
+      // navigating. Explicit invalidations still refresh data immediately.
+      staleTime: 30_000,
     },
   },
 } );

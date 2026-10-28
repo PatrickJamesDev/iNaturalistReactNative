@@ -151,15 +151,24 @@ const AddObsButton = ( ): React.Node => {
 
   // Keeps currentRoute up-to-date for the use of both navigation & tooltip logic
   React.useEffect( () => {
-    if ( navigationRef.isReady() ) {
+    const updateCurrentRoute = () => {
       const current = navigationRef.getCurrentRoute();
-      setCurrentRoute( current );
+      // Navigation emits state changes for params and nested stack updates too.
+      // Only store a new route when the screen actually changes, otherwise this
+      // re-renders the tab bar (and the hidden add-observation sheets) on every
+      // navigation event.
+      setCurrentRoute( previous => (
+        previous?.name === current?.name
+          ? previous
+          : current
+      ) );
+    };
+
+    if ( navigationRef.isReady() ) {
+      updateCurrentRoute();
     }
 
-    const unsubscribe = navigationRef.addListener( "state", () => {
-      const current = navigationRef.getCurrentRoute();
-      setCurrentRoute( current );
-    } );
+    const unsubscribe = navigationRef.addListener( "state", updateCurrentRoute );
 
     return unsubscribe;
   }, [] );

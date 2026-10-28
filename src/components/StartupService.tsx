@@ -39,20 +39,30 @@ const StartupService = ( ) => {
   const currentUser = realm.objects( "User" ).filtered( "signedIn == true" )[0]?.isValid( );
 
   useEffect( ( ) => {
-    const initializeApp = async ( ) => {
-      const checkForSignedInUser = async ( ) => {
-        // check to see if this is a fresh install of the app
-        // if it is, delete realm file when we sign the user out of the app
-        // this handles the case where a user deletes the app, then reinstalls
-        // and expects to be signed out with no previously saved data
-        const isFreshInstall = store.getBoolean( IS_FRESH_INSTALL );
-        if ( isFreshInstall ) {
-          store.set( IS_FRESH_INSTALL, false );
-          if ( !currentUser ) {
-            await signOut( { realm, clearRealm: true } );
-          }
+    const checkForSignedInUser = async ( ) => {
+      // check to see if this is a fresh install of the app
+      // if it is, delete realm file when we sign the user out of the app
+      // this handles the case where a user deletes the app, then reinstalls
+      // and expects to be signed out with no previously saved data
+      const isFreshInstall = store.getBoolean( IS_FRESH_INSTALL );
+      if ( isFreshInstall ) {
+        store.set( IS_FRESH_INSTALL, false );
+        if ( !currentUser ) {
+          await signOut( { realm, clearRealm: true } );
         }
-      };
+      }
+    };
+
+    checkForSignedInUser( ).catch( error => {
+      logger.error( "Signed-in user startup check failed:", error );
+    } );
+  }, [realm, currentUser] );
+
+  // These only need to happen once per Realm instance, not every time the user
+  // signs in or out. Re-running them re-copied the CV assets and re-registered
+  // the online listener on every auth change.
+  useEffect( ( ) => {
+    const initializeApp = async ( ) => {
       // don't remove this logger.info statement: it's used for internal metrics
       logger.info( "pickup" );
       logger.info(
@@ -60,7 +70,6 @@ const StartupService = ( ) => {
       );
 
       try {
-        await checkForSignedInUser( );
         // TODO: this sounds like something we should move to DeferredStartupService,
         // but we do need these files for the CV camera to work. So, for the subset of user that
         // open the app straight to camera we need to test that doing this deferred does not impact
@@ -72,9 +81,11 @@ const StartupService = ( ) => {
         // eventListener prevents both queries and retries (via reactQueryRetry)
         // from running unnecessarily when the app is offline
         // https://tanstack.com/query/latest/docs/framework/react/react-native#online-status-management
-        onlineManager.setEventListener( setOnline => NetInfo.addEventListener( state => {
-          setOnline( !!state.isConnected );
-        } ) );
+        onlineManager.setEventListener( setOnline => (
+          NetInfo.addEventListener( state => {
+            setOnline( !!state.isConnected );
+          } )
+        ) );
 
         // skipping location permissions here since we're manually showing
         // permission gates and don't want to pop up the native notification
@@ -89,7 +100,7 @@ const StartupService = ( ) => {
     };
 
     initializeApp( );
-  }, [realm, currentUser] );
+  }, [realm] );
 
   return null;
 };

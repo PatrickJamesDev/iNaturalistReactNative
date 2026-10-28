@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/query-core";
+import { setLogAuthModule } from "api/log";
 import type { ApiUser } from "api/types";
 import { getUserAgent } from "api/userAgent";
 import { fetchUserEmailAvailable, fetchUserMe } from "api/users";
@@ -28,6 +29,7 @@ import {
 } from "react-native-sensitive-info";
 import Realm, { UpdateMode } from "realm";
 import realmConfig from "realmModels/index";
+import { setAuthStateSnapshot } from "sharedHelpers/authState";
 import changeLanguage from "sharedHelpers/changeLanguage";
 import { EnvConfig } from "sharedHelpers/envConfig";
 import { getInstallID } from "sharedHelpers/installData";
@@ -78,7 +80,10 @@ interface AuthCache {
 const authCache: AuthCache = {
   isLoggedIn: null,
   lastChecked: null,
-  cacheTimeout: 5000,
+  // Every authenticated query calls isLoggedIn(). Keep the value longer and
+  // invalidate it through clearAuthCache() on sign-in, sign-out, and token
+  // mutations instead of re-reading secure storage every few seconds.
+  cacheTimeout: 60_000,
 };
 
 // Auth checks are kicked off by every authenticated query hook. Without deduping,
@@ -87,6 +92,18 @@ const authCache: AuthCache = {
 let pendingIsLoggedInCheck: Promise<boolean> | null = null;
 let authCacheGeneration = 0;
 let isLoggedInCheckId = 0;
+
+// The JWT is read once per API request, and every read hits native secure storage
+// (plus a hasItem check before the getItem). Keep the last read in memory so a
+// screen that fires a dozen queries only pays for one keychain round trip. Auth
+// mutations (sign in, sign out, refresh, corruption recovery) all invalidate this
+// through clearAuthCache().
+interface JwtCache {
+  token: string | null;
+  generatedAt: number | null;
+}
+let jwtCache: JwtCache | null = null;
+let pendingJwtRead: Promise<JwtCache> | null = null;
 
 // module-level tracking of jwt failures. This works around a
 // fault where different parties were competing for retries
@@ -106,8 +123,11 @@ const clearAuthCache = ( ): void => {
   pendingIsLoggedInCheck = null;
   authCache.isLoggedIn = null;
   authCache.lastChecked = null;
+  jwtCache = null;
+  pendingJwtRead = null;
   jwtRefreshFailureCount = 0;
   jwtRefreshFailedAt = null;
+  setAuthStateSnapshot( null );
 };
 
 async function getSensitiveItem(
@@ -254,11 +274,19 @@ const isLoggedIn = async (): Promise<boolean> => {
       if ( generation === authCacheGeneration ) {
         authCache.isLoggedIn = result;
         authCache.lastChecked = Date.now();
+        setAuthStateSnapshot( result );
       }
 
       return result;
     } catch ( error ) {
       console.warn( "Auth check failed:", error );
+      // A failed read must not leave every authenticated query disabled
+      // forever. Treat it as signed out until the next auth mutation.
+      if ( generation === authCacheGeneration ) {
+        authCache.isLoggedIn = false;
+        authCache.lastChecked = Date.now();
+        setAuthStateSnapshot( false );
+      }
       return false;
     } finally {
       if ( checkId === isLoggedInCheckId ) pendingIsLoggedInCheck = null;
@@ -370,13 +398,33 @@ const encodeJWT = ( payload: object, key: string, algorithm?: string ) => {
  * when getting taxon suggestions)
  * @returns encoded anonymous JWT
  */
+// Signing an anonymous JWT with jsrsasign is relatively expensive, and the log
+// transport asks for one on every log line. The token is valid for five minutes,
+// so reuse it until shortly before it expires.
+const ANONYMOUS_JWT_TTL_MS = 4 * 60 * 1000;
+let anonymousJwtCache: { token: string; expiresAt: number } | null = null;
+
 const getAnonymousJWT = (): string => {
+  const now = Date.now();
+  if ( anonymousJwtCache && now < anonymousJwtCache.expiresAt ) {
+    return anonymousJwtCache.token;
+  }
+
   const claims = {
     application: Platform.OS,
-    exp: Date.now() / 1000 + 300,
+    exp: now / 1000 + 300,
   };
 
-  return encodeJWT( claims, EnvConfig.JWT_ANONYMOUS_API_SECRET || "not-a-real-secret", "HS512" );
+  const token = encodeJWT(
+    claims,
+    EnvConfig.JWT_ANONYMOUS_API_SECRET || "not-a-real-secret",
+    "HS512",
+  );
+  anonymousJwtCache = {
+    token,
+    expiresAt: now + ANONYMOUS_JWT_TTL_MS,
+  };
+  return token;
 };
 
 // Shared promise for any in-flight token refresh. Concurrent callers that
@@ -452,6 +500,10 @@ async function fetchFreshJWT( logContext: string | null ): Promise<string | null
 
     await setSensitiveItem( "jwtToken", newJwtToken );
     await setSensitiveItem( "jwtGeneratedAt", newJwtGeneratedAt.toString() );
+    jwtCache = {
+      token: newJwtToken,
+      generatedAt: newJwtGeneratedAt,
+    };
 
     recordJwtRefreshSuccess( );
 
@@ -465,6 +517,22 @@ async function fetchFreshJWT( logContext: string | null ): Promise<string | null
   }
 }
 
+const readJwtFromSecureStorage = async (): Promise<JwtCache> => {
+  const [token, storedGeneratedAt] = await Promise.all( [
+    getSensitiveItem( "jwtToken" ),
+    getSensitiveItem( "jwtGeneratedAt" ),
+  ] );
+  const parsedGeneratedAt = storedGeneratedAt
+    ? parseInt( storedGeneratedAt, 10 )
+    : null;
+  return {
+    token: token ?? null,
+    generatedAt: parsedGeneratedAt !== null && Number.isNaN( parsedGeneratedAt )
+      ? null
+      : parsedGeneratedAt,
+  };
+};
+
 /**
  * Returns most recent JWT (JSON Web Token) for API authentication - renews the token if necessary
  *
@@ -476,13 +544,6 @@ const getJWT = async (
   allowAnonymousJWT = false,
   logContext: string | null = null,
 ): Promise<string | null> => {
-  const jwtToken: string | null | undefined = await getSensitiveItem( "jwtToken" );
-  const storedJwtGeneratedAt = await getSensitiveItem( "jwtGeneratedAt" );
-  let jwtGeneratedAt: number | null = null;
-  if ( storedJwtGeneratedAt ) {
-    jwtGeneratedAt = parseInt( storedJwtGeneratedAt, 10 );
-  }
-
   const loggedIn = await isLoggedIn();
 
   if ( !loggedIn && allowAnonymousJWT ) {
@@ -499,6 +560,23 @@ const getJWT = async (
     }
     return null;
   }
+
+  if ( !jwtCache ) {
+    // A screen that mounts a dozen authenticated queries should only trigger one
+    // keychain read.
+    const generation = authCacheGeneration;
+    pendingJwtRead ??= readJwtFromSecureStorage( ).finally( ( ) => {
+      pendingJwtRead = null;
+    } );
+    let loadedJwt = await pendingJwtRead;
+    // Don't keep a token that was read before a sign in, sign out, or refresh.
+    if ( generation !== authCacheGeneration ) {
+      pendingJwtRead = null;
+      loadedJwt = await readJwtFromSecureStorage( );
+    }
+    jwtCache = loadedJwt;
+  }
+  const { token: jwtToken, generatedAt: jwtGeneratedAt } = jwtCache;
 
   if (
     !jwtToken
@@ -666,6 +744,12 @@ async function afterAuthenticateUser(
     return { success: false };
   }
 
+  // The JWT belongs to the previous session, not necessarily this user. Drop it
+  // before saving the new access token so getJWT() fetches a token for this
+  // login instead of reusing a still-valid token for someone else.
+  await deleteSensitiveItem( "jwtToken" );
+  await deleteSensitiveItem( "jwtGeneratedAt" );
+
   // Save authentication details to secure storage
   await setSensitiveItem( "username", remoteUsername );
   await setSensitiveItem( "accessToken", accessToken );
@@ -673,12 +757,19 @@ async function afterAuthenticateUser(
   // Save userId to local, encrypted storage
   const currentUser = { id: userId, login: remoteUsername, signedIn: true };
 
-  // try to fetch user data (especially for loading user icon) from userMe
-  const apiToken = await getJWT( );
-  const options = {
-    api_token: apiToken,
-  };
-  const remoteUser = await fetchUserMe( { }, options ) as ApiUser;
+  // try to fetch user data (especially for loading user icon) from userMe.
+  // This is a nice-to-have: if secure storage or the network fails here we
+  // should still finish signing in with the credentials we already verified.
+  let remoteUser: ApiUser | null = null;
+  try {
+    const apiToken = await getJWT( );
+    const options = {
+      api_token: apiToken,
+    };
+    remoteUser = await fetchUserMe( { }, options ) as ApiUser;
+  } catch ( fetchUserError ) {
+    logger.error( "Failed to fetch user details after login:", fetchUserError );
+  }
   const localUser = remoteUser
     ? {
       ...remoteUser,
@@ -840,6 +931,10 @@ const emailAvailable = async ( email: string ) => {
   const response = await fetchUserEmailAvailable( email, options ) as { available: boolean };
   return response?.available;
 };
+
+// The log transport cannot import this module directly without creating a
+// cycle, so hand it the token helpers once this module has finished evaluating.
+setLogAuthModule( { getAnonymousJWT, getJWT } );
 
 export {
   API_HOST,

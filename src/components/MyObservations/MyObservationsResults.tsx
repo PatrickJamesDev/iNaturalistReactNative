@@ -346,8 +346,14 @@ const MyObservationsResults = ( ) => {
     };
   } ) => setMyObsOffset( scrollEvent.nativeEvent.contentOffset.y ), [setMyObsOffset] );
 
-  const numOfUserObservations = zustandStorage.getItem( "numOfUserObservations" );
-  const numOfUserSpecies = zustandStorage.getItem( "numOfUserSpecies" );
+  // These are written imperatively outside zustand, so read them once instead of
+  // hitting MMKV on every render. Live totals below supersede these snapshots.
+  const initialNumOfUserObservations = useMemo( ( ) => (
+    ( zustandStorage.getItem( "numOfUserObservations" ) as number | null ) ?? 0
+  ), [] );
+  const initialNumOfUserSpecies = useMemo( ( ) => (
+    ( zustandStorage.getItem( "numOfUserSpecies" ) as number | null ) ?? 0
+  ), [] );
   const [activeTab, setActiveTab] = useState( OBSERVATIONS_TAB );
 
   const { leafTaxonIds, numTotalTaxaLocal } = useMemo<{
@@ -449,6 +455,14 @@ const MyObservationsResults = ( ) => {
     : numTotalTaxaLocal;
 
   const numTotalObservations = totalResultsRemote || observationIds.length;
+  const numOfUserObservations = Math.max(
+    initialNumOfUserObservations,
+    numTotalObservations,
+  );
+  const numOfUserSpecies = Math.max(
+    initialNumOfUserSpecies,
+    numTotalTaxa ?? 0,
+  );
 
   // When a search is active, we want to show a live, search-informed total for observation and
   // species counts, otherwise, fallback to the values from zustand
@@ -471,18 +485,18 @@ const MyObservationsResults = ( ) => {
   useEffect( ( ) => {
     // persist this number in zustand so a user can see their latest observations count
     // even if they're offline
-    if ( numTotalObservations > numOfUserObservations ) {
+    if ( numTotalObservations > initialNumOfUserObservations ) {
       zustandStorage.setItem( "numOfUserObservations", numTotalObservations );
     }
-  }, [numTotalObservations, numOfUserObservations] );
+  }, [numTotalObservations, initialNumOfUserObservations] );
 
   useEffect( ( ) => {
     // persist this number in zustand so a user can see their latest species count
     // even if they're offline
-    if ( numTotalTaxa > numOfUserSpecies ) {
+    if ( typeof numTotalTaxa === "number" && numTotalTaxa > initialNumOfUserSpecies ) {
       zustandStorage.setItem( "numOfUserSpecies", numTotalTaxa );
     }
-  }, [numTotalTaxa, numOfUserSpecies] );
+  }, [numTotalTaxa, initialNumOfUserSpecies] );
 
   useEffect( () => {
     const newObservationCount = observationIds.length - prevObservationsLength.current;

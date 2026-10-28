@@ -58,6 +58,7 @@ const BASE_SCREEN_OPTIONS = {
     backgroundColor: "rgba(0,0,0,0)",
     opacity: 1,
   },
+  freezeOnBlur: true,
 } as const;
 
 // These screens need to be within the NoBottomTabStackNavigator

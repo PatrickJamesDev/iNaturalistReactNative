@@ -1,3 +1,7 @@
+// Keep enough recent samples for averages without retaining every scroll/fetch
+// event for the lifetime of the screen.
+const MAX_TRACKED_EVENTS = 50;
+
 class FlashListPerformanceTracker {
   private screenLoadTime: number;
 
@@ -86,6 +90,9 @@ class FlashListPerformanceTracker {
       this.currentScrollEvent.scrollDistance = Math.abs( y - this.currentScrollEvent.startY );
 
       this.scrollEvents.push( this.currentScrollEvent );
+      if ( this.scrollEvents.length > MAX_TRACKED_EVENTS ) {
+        this.scrollEvents.shift( );
+      }
       this.currentScrollEvent = null;
     }
   }
@@ -104,6 +111,9 @@ class FlashListPerformanceTracker {
         duration: fetchDuration,
         itemsCount,
       } );
+      if ( this.fetchEvents.length > MAX_TRACKED_EVENTS ) {
+        this.fetchEvents.shift( );
+      }
 
       this.persistentMetrics.lastFetchTime = fetchDuration;
       this.persistentMetrics.lastFetchTimestamp = endTime;

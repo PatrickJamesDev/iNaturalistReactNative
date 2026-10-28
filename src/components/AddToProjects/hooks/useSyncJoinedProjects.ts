@@ -1,7 +1,9 @@
 import { useNetInfo } from "@react-native-community/netinfo";
 import { RealmContext } from "providers/contexts";
 import { useEffect, useRef } from "react";
-import syncJoinedProjects from "sharedHelpers/syncJoinedProjects";
+import syncJoinedProjects, {
+  JOINED_PROJECTS_SYNC_MAX_AGE_MS,
+} from "sharedHelpers/syncJoinedProjects";
 import { useCurrentUser } from "sharedHooks";
 
 const { useRealm } = RealmContext;
@@ -23,7 +25,9 @@ const useSyncJoinedProjects = ( ) => {
       return;
     }
     hasSynced.current = true;
-    syncJoinedProjects( realm, currentUser.id );
+    syncJoinedProjects( realm, currentUser.id, {
+      maxAgeMs: JOINED_PROJECTS_SYNC_MAX_AGE_MS,
+    } );
   }, [currentUser?.id, realm, isConnected] );
 };
 

@@ -33,7 +33,7 @@ const LOGIN_SCREEN_OPTIONS = {
 } as const;
 
 const LoginStackNavigator = ( ) => (
-  <Stack.Navigator>
+  <Stack.Navigator screenOptions={{ freezeOnBlur: true }}>
     <Stack.Screen
       name="Login"
       component={Login}

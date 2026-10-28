@@ -55,14 +55,16 @@ const EvidenceList = ( {
   const [deleting, setDeleting] = useState( false );
   const imageClass = "h-16 w-16 justify-center mx-1.5 rounded-lg";
 
+  const currentObservationPhotos = currentObservation?.observationPhotos;
   const observationPhotos = useMemo(
-    ( ) => currentObservation?.observationPhotos || [],
-    [currentObservation?.observationPhotos],
+    ( ) => currentObservationPhotos || [],
+    [currentObservationPhotos],
   );
+  const currentObservationUuid = currentObservation?.uuid;
 
-  const photoUris = observationPhotos?.map(
+  const photoUris = useMemo( ( ) => observationPhotos.map(
     obsPhoto => Photo.displayLocalOrRemoteSquarePhoto( obsPhoto.photo ),
-  );
+  ), [observationPhotos] );
   const mediaUris = useMemo( ( ) => ( [
     ...photoUris,
     ...observationSounds.map( obsSound => obsSound.sound.file_url ),
@@ -189,7 +191,7 @@ const EvidenceList = ( {
       await ObservationSound.deleteLocalObservationSound(
         realm,
         uriToDelete,
-        currentObservation.uuid,
+        currentObservationUuid,
       );
       afterMediaDeleted( uriToDelete );
     }
@@ -217,12 +219,19 @@ const EvidenceList = ( {
     }
   }, [
     afterMediaDeleted,
-    currentObservation?.uuid,
+    currentObservationUuid,
     deleteObservationSoundMutate,
     deleteSoundFromObservation,
     realm,
     observationSounds,
     t,
+  ] );
+
+  const modalPhotos = useMemo( ( ) => observationPhotos.map( obsPhoto => obsPhoto.photo ), [
+    observationPhotos,
+  ] );
+  const modalSounds = useMemo( ( ) => observationSounds.map( obsSound => obsSound.sound ), [
+    observationSounds,
   ] );
 
   const evidenceList = useMemo( ( ) => (
@@ -254,9 +263,9 @@ const EvidenceList = ( {
         onClose={( ) => setSelectedMediaUri( null )}
         onDeletePhoto={onDeletePhoto}
         onDeleteSound={onDeleteSound}
-        photos={observationPhotos.map( obsPhoto => obsPhoto.photo )}
+        photos={modalPhotos}
         showModal={!!selectedMediaUri || deleting}
-        sounds={observationSounds.map( obsSound => obsSound.sound )}
+        sounds={modalSounds}
         uri={selectedMediaUri}
       />
     </>

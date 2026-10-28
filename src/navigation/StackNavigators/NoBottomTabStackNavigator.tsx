@@ -112,6 +112,7 @@ const NoBottomTabStackNavigator = ( ) => (
         contentStyle: {
           backgroundColor: "white",
         },
+        freezeOnBlur: true,
       }}
     >
       {/* Add Observation Stack Group */}

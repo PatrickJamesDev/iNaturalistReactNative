@@ -57,8 +57,17 @@ const CommunitySection = ( {
     [activityItems],
   );
 
-  const indexOfFirstTaxonDisplayed = taxonId => stableItems
-    .findIndex( item => item?.taxon?.id === taxonId );
+  const firstDisplayTaxonIds = useMemo( ( ) => {
+    const seen = new Set( );
+    const firstIds = new Set( );
+    stableItems.forEach( item => {
+      const taxonId = item?.taxon?.id;
+      if ( taxonId == null || seen.has( taxonId ) ) return;
+      seen.add( taxonId );
+      firstIds.add( taxonId );
+    } );
+    return firstIds;
+  }, [stableItems] );
 
   return (
     <View testID="CommunitySection">
@@ -70,7 +79,7 @@ const CommunitySection = ( {
             {t( "This-observation-has-no-comments-or-identifications-yet" )}
           </Body2>
         )
-        : stableItems.map( ( item, index ) => (
+        : stableItems.map( item => (
           <View
             onLayout={event => {
               if ( targetItemID === item?.id ) {
@@ -82,7 +91,7 @@ const CommunitySection = ( {
           >
             <ActivityItem
               currentUserId={userId}
-              isFirstDisplay={index === indexOfFirstTaxonDisplayed( item.taxon?.id )}
+              isFirstDisplay={firstDisplayTaxonIds.has( item.taxon?.id )}
               isConnected={isConnected}
               item={item}
               openAgreeWithIdSheet={openAgreeWithIdSheet}

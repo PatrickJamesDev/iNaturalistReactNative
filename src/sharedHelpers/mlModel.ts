@@ -3,6 +3,7 @@ import {
   DocumentDirectoryPath,
   MainBundlePath,
   readDirAssets,
+  stat,
 } from "@dr.pogodin/react-native-fs";
 import i18next from "i18next";
 import { Alert, Platform } from "react-native";
@@ -87,44 +88,57 @@ export const predictLocation = ( location: Location ) => getPredictionsForLocati
   location,
 } );
 
-const addCameraFilesAndroid = () => {
-  const copyFilesAndroid = ( source, destination ) => {
-    copyFileAssets( source, destination )
-      .then( () => {
-        console.log( `moved file from ${source} to ${destination}` );
-      } )
-      .catch( error => {
-        console.log(
-          error,
-          `error moving file from ${source} to ${destination}`,
-        );
-      } );
-  };
-
-  readDirAssets( "camera" ).then( results => {
-    const model = modelFiles.ANDROIDMODEL;
-    const taxonomy = modelFiles.ANDROIDTAXONOMY;
-    const geomodel = modelFiles.ANDROIDGEOMODEL;
-
-    const hasModel = results.find( r => r.name === model );
-
-    // Android writes over existing files
-    if ( hasModel !== undefined ) {
-      copyFilesAndroid( `camera/${model}`, modelPath );
-      copyFilesAndroid( `camera/${taxonomy}`, taxonomyPath );
-      copyFilesAndroid( `camera/${geomodel}`, geomodelPath );
-    } else {
-      Alert.alert(
-        i18next.t( "No-model-found" ),
-        i18next.t( "During-app-start-no-model-found" ),
-      );
-    }
-  } );
+const destinationMatchesAsset = async ( destination: string, assetSize: number ) => {
+  try {
+    const destinationStat = await stat( destination );
+    return destinationStat.size === assetSize;
+  } catch ( _error ) {
+    return false;
+  }
 };
 
-export const addARCameraFiles = ( ) => {
-  // RNFS overwrites whatever files existed before
-  if ( Platform.OS === "android" ) {
-    addCameraFilesAndroid( );
+const addCameraFilesAndroid = async ( ) => {
+  const results = await readDirAssets( "camera" );
+  const files = [
+    { name: modelFiles.ANDROIDMODEL, destination: modelPath },
+    { name: modelFiles.ANDROIDTAXONOMY, destination: taxonomyPath },
+    { name: modelFiles.ANDROIDGEOMODEL, destination: geomodelPath },
+  ];
+  const model = results.find( result => result.name === modelFiles.ANDROIDMODEL );
+
+  if ( !model ) {
+    Alert.alert(
+      i18next.t( "No-model-found" ),
+      i18next.t( "During-app-start-no-model-found" ),
+    );
+    return;
+  }
+
+  await Promise.all( files.map( async ( { name, destination } ) => {
+    const asset = results.find( result => result.name === name );
+    if ( !asset ) {
+      console.log( `camera asset not found: ${name}` );
+      return;
+    }
+
+    // Copying tens of MB on every launch blocks the camera and competes with
+    // startup I/O. The asset size changes when a new model is bundled.
+    if ( await destinationMatchesAsset( destination, asset.size ) ) return;
+
+    try {
+      await copyFileAssets( `camera/${name}`, destination );
+      console.log( `moved file from camera/${name} to ${destination}` );
+    } catch ( error ) {
+      console.log( error, `error moving file from camera/${name} to ${destination}` );
+    }
+  } ) );
+};
+
+export const addARCameraFiles = async ( ) => {
+  if ( Platform.OS !== "android" ) return;
+  try {
+    await addCameraFilesAndroid( );
+  } catch ( error ) {
+    console.log( error, "error adding Android camera files" );
   }
 };

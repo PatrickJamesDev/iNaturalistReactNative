@@ -16,9 +16,29 @@ const logFileName = `${logFileNamePrefix}.{date-today}.txt`;
 
 export const logFileDirectory = `${RNFS.DocumentDirectoryPath}/logs`;
 
-RNFS.exists( logFileDirectory ).then( exists => ( exists
-  ? Promise.resolve()
-  : RNFS.mkdir( logFileDirectory ) ) );
+let logDirectoryReady: Promise<void> | null = null;
+const ensureLogDirectory = ( ) => {
+  logDirectoryReady ??= RNFS.exists( logFileDirectory )
+    .then( exists => ( exists
+      ? undefined
+      : RNFS.mkdir( logFileDirectory ) ) )
+    .catch( error => {
+      // Allow a later log to retry if this attempt failed
+      logDirectoryReady = null;
+      console.error( "[logger] Failed to create log directory", error );
+    } );
+  return logDirectoryReady;
+};
+
+// fileAsyncTransport does not wait for the directory to exist, so logs written
+// during startup could fail with ENOENT. Ensure it exists first.
+const fileTransport = ( props: Parameters<typeof fileAsyncTransport>[0] ) => {
+  ensureLogDirectory( )
+    .then( ( ) => fileAsyncTransport( props ) )
+    .catch( error => {
+      console.error( "[logger] Failed to write log file", error );
+    } );
+};
 
 const sharedConfig = {
   dateFormat: "iso",
@@ -41,7 +61,7 @@ const baseLog = logger.createLogger( {
   ...sharedConfig,
   transport: [
     consoleTransport,
-    fileAsyncTransport,
+    fileTransport,
     iNatLogstashTransport,
   ],
 } );
@@ -57,6 +77,6 @@ export const logWithoutRemote = logger.createLogger( {
   ...sharedConfig,
   transport: [
     consoleTransport,
-    fileAsyncTransport,
+    fileTransport,
   ],
 } );

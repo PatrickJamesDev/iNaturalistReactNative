@@ -120,6 +120,11 @@ const FadeInPostDetails = ( ) => fadeInComponent( <PostDetails /> );
 const BASE_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: "minimal",
   headerTintColor: colors.darkGray,
+  // Screens below the focused one cannot be interacted with, so stop
+  // rendering them while they are covered. Without this, Realm updates and
+  // other background state changes keep re-rendering the previous screen
+  // during navigation.
+  freezeOnBlur: true,
 } as const;
 
 const NOTIFICATIONS_OPTIONS = {

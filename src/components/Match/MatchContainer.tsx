@@ -153,10 +153,7 @@ const MatchContainer = ( ) => {
   const evidenceHasLocation = !!currentObservation?.latitude;
 
   const [iconicTaxon, setIconicTaxon] = useState<RealmTaxon>( );
-  const [currentUserLocation, setCurrentUserLocation] = useState<{
-    latitude?: number;
-    longitude?: number;
-  } | null>( null );
+  const lastUserLocationRef = useRef<string | null>( null );
 
   const [state, dispatch] = useReducer( reducer, {
     ...initialState,
@@ -315,15 +312,14 @@ const MatchContainer = ( ) => {
     }
   };
 
-  const getCurrentUserPlaceName = useCallback( async () => {
-    if ( currentUserLocation?.latitude ) {
-      const placeGuess
-      = await fetchPlaceName( currentUserLocation?.latitude, currentUserLocation?.longitude );
+  const getCurrentUserPlaceName = useCallback( async ( location = userLocation ) => {
+    if ( location?.latitude ) {
+      const placeGuess = await fetchPlaceName( location.latitude, location.longitude );
       if ( placeGuess ) {
         updateObservationKeys( { place_guess: placeGuess } );
       }
     }
-  }, [currentUserLocation, updateObservationKeys] );
+  }, [updateObservationKeys, userLocation] );
 
   const handleRefetchSuggestions = useCallback( ( location: {
     latitude?: number;
@@ -351,20 +347,23 @@ const MatchContainer = ( ) => {
 
   useEffect( () => {
     if ( !scoreImageParams ) return;
-    if ( userLocation === currentUserLocation ) return;
     if ( !userLocation?.latitude ) return;
 
-    setCurrentUserLocation( userLocation );
-    updateObservationKeys( userLocation );
+    const locationKey = `${userLocation.latitude},${userLocation.longitude}`;
+    if ( lastUserLocationRef.current === locationKey ) return;
+    lastUserLocationRef.current = locationKey;
 
-    getCurrentUserPlaceName();
+    updateObservationKeys( userLocation );
+    getCurrentUserPlaceName( userLocation );
 
     if ( !hasRefetchedSuggestions && suggestions ) {
+      // Location arrives after the initial render, so this refresh is an
+      // intentional reaction to an external value rather than derived state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       handleRefetchSuggestions( userLocation );
     }
   }, [
     userLocation,
-    currentUserLocation,
     scoreImageParams,
     suggestions,
     hasRefetchedSuggestions,
@@ -419,11 +418,16 @@ const MatchContainer = ( ) => {
   // not the prettiest code; trying to be consistent about showing common name
   // and taxon photo for offline suggestions in AICamera and otherSuggestions
   // without relying on the useTaxon hook which only deals with one taxon at a time
-  const topSuggestionInRealm = realm.objects( "Taxon" ).filtered( "id IN $0", [taxonId] );
-  const topSuggestionWithLocalTaxon = tryToReplaceWithLocalTaxon(
-    topSuggestionInRealm,
-    topSuggestion,
-  );
+  const topSuggestionInRealm = useMemo( ( ) => (
+    ( taxonId
+      ? realm.objects( "Taxon" ).filtered( "id IN $0", [taxonId] )
+      : [] ) as unknown as RealmTaxon[]
+  ), [realm, taxonId] );
+  const topSuggestionWithLocalTaxon = useMemo( ( ) => (
+    topSuggestion
+      ? tryToReplaceWithLocalTaxon( topSuggestionInRealm, topSuggestion )
+      : undefined
+  ), [topSuggestionInRealm, topSuggestion] );
 
   const suggestionsLoading = onlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_LOADING
     || offlineFetchStatus === FETCH_STATUSES.FETCH_STATUS_LOADING;
@@ -447,8 +451,11 @@ const MatchContainer = ( ) => {
   ] );
 
   // Remove the top suggestion from the list of other suggestions
-  const otherSuggestions = orderedSuggestions
-    .filter( suggestion => suggestion.taxon.id !== taxonId );
+  const otherSuggestions = useMemo( ( ) => orderedSuggestions
+    .filter( suggestion => suggestion.taxon.id !== taxonId ), [
+    orderedSuggestions,
+    taxonId,
+  ] );
 
   const navToTaxonDetails
   = ( photo?: ApiPhoto | RealmPhoto ) => {
@@ -472,12 +479,20 @@ const MatchContainer = ( ) => {
     exitObservationFlow( );
   };
 
-  const taxonIds = otherSuggestions?.map( suggestion => suggestion.taxon.id );
-  const localTaxa = realm.objects( "Taxon" ).filtered( "id IN $0", taxonIds );
+  const taxonIds = useMemo( ( ) => otherSuggestions
+    .map( suggestion => suggestion.taxon.id ), [otherSuggestions] );
+  const localTaxa = useMemo( ( ) => (
+    ( taxonIds.length > 0
+      ? realm.objects( "Taxon" ).filtered( "id IN $0", taxonIds )
+      : [] ) as unknown as RealmTaxon[]
+  ), [realm, taxonIds] );
 
   // show local taxon photos in additional suggestions list if they're available
-  const suggestionsWithLocalTaxonPhotos = otherSuggestions
-    .map( suggestion => tryToReplaceWithLocalTaxon( localTaxa, suggestion ) );
+  const suggestionsWithLocalTaxonPhotos = useMemo( ( ) => otherSuggestions
+    .map( suggestion => tryToReplaceWithLocalTaxon( localTaxa, suggestion ) ), [
+    localTaxa,
+    otherSuggestions,
+  ] );
 
   return (
     <>

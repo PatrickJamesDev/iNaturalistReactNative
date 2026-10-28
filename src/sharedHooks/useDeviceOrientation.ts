@@ -14,6 +14,10 @@ export const PORTRAIT = "portrait" as const;
 export const PORTRAIT_UPSIDE_DOWN = "portrait-upside-down" as const;
 
 const { width, height } = Dimensions.get( "screen" );
+const INITIAL_DEVICE_ORIENTATION = width > height
+  ? LANDSCAPE_LEFT
+  : PORTRAIT;
+const IS_TABLET = DeviceInfo.isTablet( );
 
 export function orientationLockerToIosOrientation( orientation: OrientationType ): string {
   // react-native-orientation-locker and react-native-vision-camera  different
@@ -32,7 +36,9 @@ export function orientationLockerToIosOrientation( orientation: OrientationType 
 }
 
 const useDeviceOrientation = ( ) => {
-  const [deviceOrientation, setDeviceOrientation] = useState<string>( );
+  const [deviceOrientation, setDeviceOrientation] = useState<string>(
+    INITIAL_DEVICE_ORIENTATION,
+  );
 
   useDeviceOrientationChange( ( orientation: OrientationType ) => {
     // FACE-UP and FACE-DOWN could be portrait or landscape, I guess the
@@ -49,7 +55,8 @@ const useDeviceOrientation = ( ) => {
   } );
 
   const orientation = useMemo( ( ) => {
-    const isLandscapeMode = [LANDSCAPE_LEFT, LANDSCAPE_RIGHT].includes( deviceOrientation );
+    const isLandscapeMode = deviceOrientation === LANDSCAPE_LEFT
+      || deviceOrientation === LANDSCAPE_RIGHT;
 
     const screenWidth = isLandscapeMode
       ? Math.max( width, height )
@@ -61,7 +68,7 @@ const useDeviceOrientation = ( ) => {
 
     return {
       deviceOrientation,
-      isTablet: DeviceInfo.isTablet( ),
+      isTablet: IS_TABLET,
       isLandscapeMode,
       screenWidth,
       screenHeight,

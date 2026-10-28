@@ -62,7 +62,9 @@ const Suggestions = ( {
     topSuggestion,
   } = suggestions;
 
-  const taxonIds = otherSuggestions?.map( s => s.taxon.id );
+  const taxonIds = useMemo( ( ) => otherSuggestions?.map( s => s.taxon.id ), [
+    otherSuggestions,
+  ] );
   const observers = useObservers( taxonIds );
   const isEmptyList = !topSuggestion && otherSuggestions?.length === 0;
   const showOfflineText = !isLoading && usingOfflineSuggestions && !isEmptyList;
@@ -125,16 +127,16 @@ const Suggestions = ( {
     showOfflineText,
   ] );
 
-  const renderSectionHeader = ( { section } ) => {
+  const renderSectionHeader = useCallback( ( { section } ) => {
     if ( section?.data.length === 0 || isLoading ) {
       return null;
     }
     return (
       <Heading4 className="mt-6 mb-4 ml-4 bg-white">{section?.title}</Heading4>
     );
-  };
+  }, [isLoading] );
 
-  const renderTopSuggestion = ( { item } ) => {
+  const renderTopSuggestion = useCallback( ( { item } ) => {
     if ( isLoading ) { return null; }
     if ( !item ) {
       return (
@@ -152,13 +154,10 @@ const Suggestions = ( {
         />
       </View>
     );
-  };
+  }, [isLoading, onTaxonChosen, t] );
 
-  const createSections = ( ) => {
-    if ( isLoading ) {
-      return [];
-    }
-    if ( isEmptyList ) {
+  const sections = useMemo( ( ) => {
+    if ( isLoading || isEmptyList ) {
       return [];
     }
     return [{
@@ -172,9 +171,7 @@ const Suggestions = ( {
       title: t( "OTHER-SUGGESTIONS" ),
       data: otherSuggestions,
     }];
-  };
-
-  const sections = createSections( );
+  }, [isLoading, isEmptyList, t, topSuggestion, otherSuggestions, renderTopSuggestion] );
 
   return (
     <ScreenShell testID="suggestions">

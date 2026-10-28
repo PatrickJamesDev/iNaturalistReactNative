@@ -65,10 +65,10 @@ const GroupPhotos = ( {
     numColumns,
   } = useGridLayout( );
   const [buttonBarHeight, setButtonBarHeight] = useState<number | null>( null );
-  const extractKey = ( item: GroupPhotosListItem, index: number ) => (
+  const extractKey = ( item: GroupPhotosListItem ) => (
     isEmptyGridItem( item )
       ? "empty"
-      : `${item.photos[0].image.uri}${index}`
+      : item.photos[0].image.uri
   );
 
   const noObsSelected = selectedObservations.length === 0;
@@ -79,7 +79,7 @@ const GroupPhotos = ( {
   const renderImage = useCallback( ( item: GroupedPhoto ) => (
     <GroupPhotoImage
       item={item}
-      selectedObservations={selectedObservations}
+      isSelected={selectedObservations.includes( item )}
       selectObservationPhotos={selectObservationPhotos}
       style={gridItemStyle}
     />

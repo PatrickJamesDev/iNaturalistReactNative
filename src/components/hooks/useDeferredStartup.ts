@@ -27,7 +27,9 @@ import { LAST_CRASH_DATA, store as installDataMMKVStorage } from "sharedHelpers/
 import { log } from "sharedHelpers/logger";
 import { logSentinelFiles } from "sharedHelpers/sentinelFiles";
 import getStorageMetrics from "sharedHelpers/storageMetrics";
-import syncJoinedProjects from "sharedHelpers/syncJoinedProjects";
+import syncJoinedProjects, {
+  JOINED_PROJECTS_SYNC_MAX_AGE_MS,
+} from "sharedHelpers/syncJoinedProjects";
 import { useTranslation } from "sharedHooks";
 
 const { useRealm } = RealmContext;
@@ -123,7 +125,9 @@ const useDeferredStartup = ( ) => {
       if ( !currentUserId ) {
         return;
       }
-      await syncJoinedProjects( realm, currentUserId );
+      await syncJoinedProjects( realm, currentUserId, {
+        maxAgeMs: JOINED_PROJECTS_SYNC_MAX_AGE_MS,
+      } );
     }, 30000 );
 
     return ( ) => {

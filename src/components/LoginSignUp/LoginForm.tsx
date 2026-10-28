@@ -109,39 +109,48 @@ const LoginForm = ( {
 
   const logIn = useCallback( async ( logInCallback: () => Promise<AuthenticateUserResult> ) => {
     setLoading( true );
-    const result = await logInCallback( );
+    setError( null );
+    try {
+      const result = await logInCallback( );
 
-    if ( !result.success ) {
+      if ( !result.success ) {
+        setError( t( "Failed-to-log-in" ) );
+        setLoading( false );
+        return;
+      }
+
+      setLoading( false );
+
+      if (
+        result.observationsCount
+        && result.observationsCount >= AUTO_ADVANCED_MODE_OBSERVATION_THRESHOLD
+      ) {
+        // If a user that just logged in already has more than the threshold number of observations,
+        // we assume they are an advanced user and switch them to advanced mode.
+        setIsDefaultMode( false );
+      } else {
+        // Set a state to zustand that we just logged in while in default mode
+        setLoggedInWhileInDefaultMode( isDefaultMode );
+      }
+      if ( params?.prevScreen && params?.projectId ) {
+        navigation.navigate( "TabNavigator", {
+          screen: "ObservationsTab",
+          params: {
+            screen: "ProjectDetails",
+            params: {
+              id: params.projectId,
+            },
+          },
+        } );
+      } else {
+        navigation.getParent( )?.goBack( );
+      }
+    } catch ( loginError ) {
+      // Secure storage and Realm failures otherwise leave the button spinning
+      // forever with no explanation.
+      console.error( "Login failed", loginError );
       setError( t( "Failed-to-log-in" ) );
       setLoading( false );
-      return;
-    }
-
-    setLoading( false );
-
-    if (
-      result.observationsCount
-      && result.observationsCount >= AUTO_ADVANCED_MODE_OBSERVATION_THRESHOLD
-    ) {
-      // If a user that just logged in already has more than the threshold number of observations,
-      // we assume they are an advanced user and switch them to advanced mode.
-      setIsDefaultMode( false );
-    } else {
-      // Set a state to zustand that we just logged in while in default mode
-      setLoggedInWhileInDefaultMode( isDefaultMode );
-    }
-    if ( params?.prevScreen && params?.projectId ) {
-      navigation.navigate( "TabNavigator", {
-        screen: "ObservationsTab",
-        params: {
-          screen: "ProjectDetails",
-          params: {
-            id: params.projectId,
-          },
-        },
-      } );
-    } else {
-      navigation.getParent( )?.goBack( );
     }
   }, [
     navigation,

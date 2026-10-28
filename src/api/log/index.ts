@@ -1,7 +1,5 @@
 import { getUserAgent } from "api/userAgent";
 import { create } from "apisauce";
-// eslint-disable-next-line import/no-cycle
-import { getAnonymousJWT, getJWT } from "components/LoginSignUp/AuthenticationService";
 import type { transportFunctionType } from "react-native-logs";
 import { EnvConfig } from "sharedHelpers/envConfig";
 import { getInstallID } from "sharedHelpers/installData";
@@ -12,13 +10,35 @@ import { extraSentinelKey } from "./enhanceLoggerWithExtra";
 const API_HOST: string
     = EnvConfig.API_URL || process.env.API_URL || "https://api.inaturalist.org/v2";
 
-const api = create( {
-  baseURL: API_HOST,
-  headers: {
-    "User-Agent": getUserAgent( ),
-    "X-Installation-ID": getInstallID( ),
-  },
-} );
+let api: ReturnType<typeof create> | null = null;
+const getApi = ( ) => {
+  if ( !api ) {
+    api = create( {
+      baseURL: API_HOST,
+      headers: {
+        "User-Agent": getUserAgent( ),
+        "X-Installation-ID": getInstallID( ),
+      },
+    } );
+  }
+  return api;
+};
+
+// AuthenticationService imports the logger, which imports this transport, so a
+// static import here would make that cycle crash while the logger is still
+// initializing. AuthenticationService registers its token functions here once
+// it has finished loading instead.
+interface AuthModule {
+  getJWT: (
+    allowAnonymousJWT?: boolean,
+    logContext?: string | null,
+  ) => Promise<string | null>;
+  getAnonymousJWT: ( ) => string;
+}
+let authModule: AuthModule | null = null;
+const setLogAuthModule = ( module: AuthModule ) => {
+  authModule = module;
+};
 
 // at least answers: does it look enough like an Error for logging purposes?
 function isError( value: unknown ): value is { message?: string; stack?: string } {
@@ -84,6 +104,9 @@ const iNatLogstashTransport: transportFunctionType<iNatLogstashTransportOptions>
   // pull potential `extra` out of the rest params
   const { messageParams, extra } = extractExtra( props.rawMsg );
 
+  if ( !authModule ) return;
+  const { getJWT, getAnonymousJWT } = authModule;
+
   let userToken;
   try {
     userToken = await getJWT();
@@ -133,7 +156,7 @@ const iNatLogstashTransport: transportFunctionType<iNatLogstashTransportOptions>
     backtrace,
   };
   try {
-    await api.post( "/log", formData, {
+    await getApi( ).post( "/log", formData, {
       headers: {
         Authorization: [
           userToken,
@@ -152,5 +175,7 @@ const iNatLogstashTransport: transportFunctionType<iNatLogstashTransportOptions>
 };
 
 export { default as enhanceLoggerWithExtra } from "./enhanceLoggerWithExtra";
+
+export { setLogAuthModule };
 
 export default iNatLogstashTransport;

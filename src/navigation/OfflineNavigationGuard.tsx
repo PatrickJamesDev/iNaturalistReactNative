@@ -5,7 +5,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { useReactNavigationDevTools } from "@rozenite/react-navigation-plugin";
 import type { PropsWithChildren } from "react";
 import React, { useRef } from "react";
-import { Alert } from "react-native";
+import { Alert, InteractionManager } from "react-native";
 import { logFirebaseScreenView } from "sharedHelpers/tracking";
 import { useTranslation } from "sharedHooks";
 
@@ -24,9 +24,13 @@ const OfflineNavigationGuard = ( { children }: PropsWithChildren ) => {
   const onStateChange = ( ) => {
     const previousRouteName = routeNameRef.current;
     const currentRouteName = navigationRef.current?.getCurrentRoute( )?.name;
-    // Basic screen tracking with Firebase Analytics
+    // Basic screen tracking with Firebase Analytics. Defer the native
+    // analytics call until the navigation transition has finished so it does
+    // not compete with the screen mount on the JS thread.
     if ( previousRouteName !== currentRouteName && currentRouteName ) {
-      logFirebaseScreenView( currentRouteName );
+      InteractionManager.runAfterInteractions( ( ) => {
+        logFirebaseScreenView( currentRouteName );
+      } );
     }
     if ( currentRouteName === "Login" && !isConnected ) {
       // return to previous screen if offline
@@ -38,6 +42,7 @@ const OfflineNavigationGuard = ( { children }: PropsWithChildren ) => {
         );
       }
     }
+    routeNameRef.current = currentRouteName;
   };
 
   return (

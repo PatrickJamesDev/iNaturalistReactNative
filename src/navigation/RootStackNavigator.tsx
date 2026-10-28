@@ -19,7 +19,14 @@ const RootStackNavigator = ( ) => {
   const [onboardingShown] = useOnboardingShown( );
 
   return (
-    <Stack.Navigator screenOptions={{ ...hideHeader, ...preventSwipeToGoBack, animation: "none" }}>
+    <Stack.Navigator
+      screenOptions={{
+        ...hideHeader,
+        ...preventSwipeToGoBack,
+        animation: "none",
+        freezeOnBlur: true,
+      }}
+    >
       {!onboardingShown && (
         <Stack.Screen
           name="OnboardingStackNavigator"

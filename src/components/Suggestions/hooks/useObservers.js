@@ -1,6 +1,7 @@
 // @flow
 
 import { fetchObservers } from "api/observationsTyped";
+import { useMemo } from "react";
 import { useAuthenticatedQuery } from "sharedHooks";
 
 const params = {
@@ -25,7 +26,9 @@ const useObservers = ( taxonIds: number[] ): string[] => {
     },
   );
 
-  return data?.results?.map( result => result.user.login );
+  return useMemo( ( ) => data?.results?.map( result => result.user.login ), [
+    data?.results,
+  ] );
 };
 
 export default useObservers;

@@ -2,13 +2,16 @@ import { CustomFlashList } from "components/SharedComponents";
 import { View } from "components/styledComponents";
 import { RealmContext } from "providers/contexts";
 import React, {
-  useCallback,
+  useCallback, useMemo,
 } from "react";
 import type { RealmTaxon } from "realmModels/types";
 
 import IconicSuggestion from "./IconicSuggestion";
 
 const { useRealm } = RealmContext;
+
+const keyExtractor = ( item: RealmTaxon ) => `${item?.id}`;
+const renderHeader = ( ) => <View className="ml-4" />;
 
 interface Props {
   iconicTaxonChosen?: RealmTaxon;
@@ -21,34 +24,28 @@ const IconicSuggestionsScroll = ( {
 }: Props ) => {
   const realm = useRealm();
 
-  const iconicTaxa = realm?.objects( "Taxon" ).filtered( "isIconic = true" );
+  const iconicTaxa = useMemo( ( ) => (
+    realm?.objects( "Taxon" ).filtered( "isIconic = true" )
+  ) as unknown as RealmTaxon[], [realm] );
 
-  const handleIconicSuggestionPress = useCallback(
-    ( iconicTaxon: RealmTaxon ) => {
-      onIconicTaxonChosen( iconicTaxon );
-    },
-    [onIconicTaxonChosen],
-  );
-
-  const renderItem = ( { item: taxon }: { item: RealmTaxon } ) => {
+  const renderItem = useCallback( ( info: { item: RealmTaxon } ) => {
+    const taxon = info.item;
     const selected = iconicTaxonChosen?.id === taxon?.id;
     return (
       <IconicSuggestion
-        handlePress={() => handleIconicSuggestionPress( taxon )}
+        handlePress={() => onIconicTaxonChosen( taxon )}
         taxon={taxon}
         selected={selected}
       />
     );
-  };
-
-  const renderHeader = () => <View className="ml-4" />;
+  }, [iconicTaxonChosen?.id, onIconicTaxonChosen] );
   return (
     <View className="mt-4">
       <CustomFlashList
         ListHeaderComponent={renderHeader}
         horizontal
         renderItem={renderItem}
-        keyExtractor={( item: RealmTaxon ) => `${item?.id}`}
+        keyExtractor={keyExtractor}
         data={iconicTaxa}
       />
     </View>
