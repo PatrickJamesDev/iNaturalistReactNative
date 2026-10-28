@@ -8,10 +8,14 @@ import { OBS_DETAILS_TAB } from "stores/createLayoutSlice";
 import useStore from "stores/useStore";
 
 interface Props {
+  markNotificationViewed: ( _notificationId: number ) => void;
   notification: Notification;
 }
 
-const NotificationsListItem = ( { notification }: Props ) => {
+const NotificationsListItem = ( {
+  markNotificationViewed,
+  notification,
+}: Props ) => {
   const setObsDetailsTab = useStore( state => state.setObsDetailsTab );
   const navigation = useNavigation( );
   const viewedStatus = notification.viewed;
@@ -28,6 +32,9 @@ const NotificationsListItem = ( { notification }: Props ) => {
         },
       )}
       onPress={( ) => {
+        if ( !viewedStatus ) {
+          markNotificationViewed( notification.id );
+        }
         setObsDetailsTab( OBS_DETAILS_TAB.ACTIVITY );
         navigation.push( "ObsDetails", {
           uuid: notification.resource_uuid,

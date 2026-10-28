@@ -1,6 +1,7 @@
 import { fetchUnviewedObservationUpdatesCount } from "api/observations";
 import NotificationsIcon from "navigation/BottomTabNavigator/NotificationsIcon";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { AppState } from "react-native";
 import {
   useAuthenticatedQuery,
   useCurrentUser,
@@ -20,6 +21,14 @@ const NotificationsIconContainer = ( {
 }: Props ) => {
   const currentUser = useCurrentUser( );
   const observationMarkedAsViewedAt = useStore( state => state.observationMarkedAsViewedAt );
+  const [isAppActive, setIsAppActive] = useState( AppState.currentState === "active" );
+
+  useEffect( ( ) => {
+    const subscription = AppState.addEventListener( "change", nextAppState => {
+      setIsAppActive( nextAppState === "active" );
+    } );
+    return ( ) => subscription.remove( );
+  }, [] );
 
   // TODO: enable fields if it makes sense
   // https://linear.app/inaturalist/issue/MOB-1362/enable-fields-for-unviewed-updates-count-in-notificationsicon
@@ -29,10 +38,14 @@ const NotificationsIconContainer = ( {
     ],
     optsWithAuth => fetchUnviewedObservationUpdatesCount( {}, optsWithAuth ),
     {
-      enabled: !!currentUser,
+      enabled: !!currentUser && isAppActive,
       // We want to check for notifications at a set interval, but
       // keep a stable query key so we don't create unbounded cached queries.
-      refetchInterval: 60_000,
+      // Stop polling while the app is backgrounded so it doesn't drain the
+      // battery or wake the network when the user isn't looking.
+      refetchInterval: isAppActive
+        ? 60_000
+        : false,
     },
   );
 

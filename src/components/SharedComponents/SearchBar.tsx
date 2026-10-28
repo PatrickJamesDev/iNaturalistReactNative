@@ -104,6 +104,9 @@ const SearchBar = ( {
         ref={input}
         accessibilityLabel={t( "Search-for-a-taxon" )}
         activeUnderlineColor={colors.darkGray}
+        autoCapitalize="none"
+        autoComplete="off"
+        autoCorrect={false}
         autoFocus={autoFocus}
         dense
         keyboardType="default"
@@ -112,6 +115,7 @@ const SearchBar = ( {
         outlineStyle={outlineStyle}
         placeholder={placeholder}
         selectionColor={colors.darkGray}
+        spellCheck={false}
         style={style}
         testID={testID}
         theme={fontTheme}

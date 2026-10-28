@@ -1,3 +1,5 @@
+import type { InfiniteData } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { fetchObservationUpdates, fetchRemoteObservations } from "api/observations";
 import type {
   ApiNotification,
@@ -7,7 +9,9 @@ import type {
 } from "api/types";
 import flatten from "lodash/flatten";
 import { RealmContext } from "providers/contexts";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback, useEffect, useMemo, useState,
+} from "react";
 import type Realm from "realm";
 import Observation from "realmModels/Observation";
 import { useAuthenticatedInfiniteQuery, useCurrentUser } from "sharedHooks";
@@ -28,6 +32,7 @@ interface InfiniteNotificationsScrollResponse {
   isFetching?: boolean;
   isInitialLoading?: boolean;
   showStillLoadingMessage: boolean;
+  markNotificationViewed: ( _notificationId: number ) => void;
   notifications: Notification[];
   refetch: ( ) => void;
 }
@@ -93,12 +98,42 @@ const useInfiniteNotificationsScroll = (
 ): InfiniteNotificationsScrollResponse => {
   const currentUser = useCurrentUser( );
   const realm = useRealm( );
+  const queryClient = useQueryClient( );
   const [showStillLoadingMessage, setShowStillLoadingMessage] = useState( false );
 
   const queryKey = useMemo(
     () => ["useInfiniteNotificationsScroll", JSON.stringify( notificationParams )],
     [notificationParams],
   );
+
+  // Update the list and both unread badges immediately. The server is still
+  // responsible for persisting the viewed state when ObsDetails loads.
+  const markNotificationViewed = useCallback( ( notificationId: number ) => {
+    queryClient.setQueriesData<InfiniteData<Notification[]>>(
+      { queryKey: ["useInfiniteNotificationsScroll"] },
+      oldData => {
+        if ( !oldData?.pages ) return oldData;
+        let changed = false;
+        const pages = oldData.pages.map( page => page.map( notification => {
+          if ( notification.id !== notificationId || notification.viewed ) {
+            return notification;
+          }
+          changed = true;
+          return { ...notification, viewed: true };
+        } ) );
+        return changed
+          ? { ...oldData, pages }
+          : oldData;
+      },
+    );
+
+    queryClient.setQueriesData<number>(
+      { predicate: query => query.queryKey.includes( "notificationsCount" ) },
+      oldCount => ( typeof oldCount === "number"
+        ? Math.max( 0, oldCount - 1 )
+        : oldCount ),
+    );
+  }, [queryClient] );
 
   const {
     data,
@@ -197,6 +232,7 @@ const useInfiniteNotificationsScroll = (
     isError,
     isFetching,
     isInitialLoading,
+    markNotificationViewed,
     showStillLoadingMessage,
     // Disable fetchNextPage if signed out
     fetchNextPage: currentUser

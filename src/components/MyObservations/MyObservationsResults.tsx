@@ -4,6 +4,7 @@ import {
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { FlashListRef } from "@shopify/flash-list";
 import { fetchSpeciesCounts } from "api/observations";
+import { TAB_PRESSED } from "navigation/BottomTabNavigator/events";
 import { RealmContext } from "providers/contexts";
 import {
   MY_OBSERVATIONS_ACTION,
@@ -17,6 +18,7 @@ import React, {
   useState,
 } from "react";
 import { Alert } from "react-native";
+import { EventRegister } from "react-native-event-listeners";
 import Observation from "realmModels/Observation";
 import Taxon from "realmModels/Taxon";
 import type { RealmObservation } from "realmModels/types";
@@ -355,6 +357,24 @@ const MyObservationsResults = ( ) => {
     ( zustandStorage.getItem( "numOfUserSpecies" ) as number | null ) ?? 0
   ), [] );
   const [activeTab, setActiveTab] = useState( OBSERVATIONS_TAB );
+
+  useEffect( ( ) => {
+    const listener = EventRegister.addEventListener(
+      TAB_PRESSED,
+      ( tabName: string ) => {
+        if ( tabName !== "ObservationsTab" || layout === "map" ) return;
+        if ( activeTab === TAXA_TAB ) {
+          taxaListRef.current?.scrollToOffset( { offset: 0, animated: true } );
+          return;
+        }
+        listRef.current?.scrollToOffset( { offset: 0, animated: true } );
+        setMyObsOffset( 0 );
+      },
+    );
+    return ( ) => {
+      EventRegister.removeEventListener( listener as string );
+    };
+  }, [activeTab, layout, setMyObsOffset] );
 
   const { leafTaxonIds, numTotalTaxaLocal } = useMemo<{
     leafTaxonIds: number[];

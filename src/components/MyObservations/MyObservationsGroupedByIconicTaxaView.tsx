@@ -8,10 +8,12 @@ import {
 } from "components/SharedComponents";
 import { Pressable, View } from "components/styledComponents";
 import type { TFunction } from "i18next";
+import { TAB_PRESSED } from "navigation/BottomTabNavigator/events";
 import { useMyObservations } from "providers/MyObservationsContext";
 import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
+import { EventRegister } from "react-native-event-listeners";
 import { ICONIC_TAXA_GROUP, iconicTaxaGroupIcon } from "sharedHelpers/iconicTaxaGroupOrder";
 import { useCurrentUser, useTranslation } from "sharedHooks";
 import type { MyObservationsSlice } from "stores/createMyObservationsSlice";
@@ -69,6 +71,19 @@ const MyObservationsGroupedByIconicTaxaView = ( {
   const { state } = useMyObservations( );
   const { observationsSort } = state;
   const listRef = useRef<FlashListRef<IconicTaxaRow>>( null );
+
+  useEffect( ( ) => {
+    const listener = EventRegister.addEventListener(
+      TAB_PRESSED,
+      ( tabName: string ) => {
+        if ( tabName !== "ObservationsTab" ) return;
+        listRef.current?.scrollToOffset( { offset: 0, animated: true } );
+      },
+    );
+    return ( ) => {
+      EventRegister.removeEventListener( listener as string );
+    };
+  }, [] );
 
   const titlesByCategory = useMemo( ( ) => iconicTaxaGroupTitles( t ), [t] );
 

@@ -1,3 +1,4 @@
+import type { FlashListRef } from "@shopify/flash-list";
 import NotificationsListItem from "components/Notifications/NotificationsListItem";
 import {
   ActivityIndicator,
@@ -9,7 +10,11 @@ import {
   OfflineNotice,
 } from "components/SharedComponents";
 import { View } from "components/styledComponents";
-import React, { useCallback, useMemo } from "react";
+import { TAB_PRESSED } from "navigation/BottomTabNavigator/events";
+import React, {
+  useCallback, useEffect, useMemo, useRef,
+} from "react";
+import { EventRegister } from "react-native-event-listeners";
 import type { RealmUser } from "realmModels/types";
 import { useTranslation } from "sharedHooks";
 import type { Notification } from "sharedHooks/useInfiniteNotificationsScroll";
@@ -24,6 +29,7 @@ interface Props {
   isFetching?: boolean;
   isInitialLoading?: boolean;
   isConnected: boolean | null;
+  markNotificationViewed: ( _notificationId: number ) => void;
   showStillLoadingMessage: boolean;
   onEndReached: ( ) => void;
   onRefresh: ( ) => void;
@@ -45,6 +51,7 @@ const NotificationsList = ( {
   isFetching,
   isInitialLoading,
   isConnected,
+  markNotificationViewed,
   showStillLoadingMessage,
   onEndReached,
   onRefresh,
@@ -52,9 +59,27 @@ const NotificationsList = ( {
   refreshing,
 }: Props ) => {
   const { t } = useTranslation( );
+  const listRef = useRef<FlashListRef<Notification>>( null );
+
+  useEffect( ( ) => {
+    const listener = EventRegister.addEventListener(
+      TAB_PRESSED,
+      ( tabName: string ) => {
+        if ( tabName !== "NotificationsTab" ) return;
+        listRef.current?.scrollToOffset( { offset: 0, animated: true } );
+      },
+    );
+    return ( ) => {
+      EventRegister.removeEventListener( listener as string );
+    };
+  }, [] );
+
   const renderItem = useCallback( ( { item }: RenderItemProps ) => (
-    <NotificationsListItem notification={item} />
-  ), [] );
+    <NotificationsListItem
+      notification={item}
+      markNotificationViewed={markNotificationViewed}
+    />
+  ), [markNotificationViewed] );
 
   const footerComponent = useMemo( ( ) => (
     <InfiniteScrollLoadingWheel
@@ -129,6 +154,7 @@ const NotificationsList = ( {
       onEndReached={onEndReached}
       refreshing={isFetching}
       refreshControl={refreshControl}
+      ref={listRef}
       renderItem={renderItem}
     />
   );

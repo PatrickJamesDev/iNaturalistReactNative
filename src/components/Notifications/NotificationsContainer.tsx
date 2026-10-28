@@ -29,6 +29,7 @@ const NotificationsContainer = ( {
     isError,
     isFetching,
     isInitialLoading,
+    markNotificationViewed,
     showStillLoadingMessage,
     notifications,
     refetch,
@@ -62,6 +63,7 @@ const NotificationsContainer = ( {
       isFetching={isFetching}
       isInitialLoading={isInitialLoading}
       isConnected={isConnected}
+      markNotificationViewed={markNotificationViewed}
       showStillLoadingMessage={showStillLoadingMessage}
       onEndReached={fetchNextPage}
       reload={refetch}

@@ -17,7 +17,7 @@ export type AuthenticatedQueryOptions<Response> = Omit<
   allowAnonymousJWT?: boolean;
   enabled?: boolean;
   retry?: boolean;
-  refetchInterval?: number;
+  refetchInterval?: number | false;
 }
 
 export type QueryFunction<Response>

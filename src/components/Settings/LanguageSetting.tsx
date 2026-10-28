@@ -24,13 +24,19 @@ interface Props {
 const localesToOptions = (
   localesResponse?: LocalesResponse,
 ): LocalesOptions => Object.fromEntries(
-  ( localesResponse ?? [] ).map( locale => [
-    locale.locale,
-    {
-      label: locale.language_in_locale,
-      value: locale.locale,
-    },
-  ] ),
+  [...( localesResponse ?? [] )]
+    .sort( ( a, b ) => a.language_in_locale.localeCompare(
+      b.language_in_locale,
+      undefined,
+      { sensitivity: "base" },
+    ) )
+    .map( locale => [
+      locale.locale,
+      {
+        label: locale.language_in_locale,
+        value: locale.locale,
+      },
+    ] ),
 );
 
 const LanguageSetting = ( { onChange }: Props ) => {

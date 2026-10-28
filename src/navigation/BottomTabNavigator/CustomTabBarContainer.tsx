@@ -8,10 +8,12 @@ import {
   SCREEN_NAME_ROOT_EXPLORE,
 } from "navigation/StackNavigators/TabStackNavigator";
 import React, { useCallback, useMemo } from "react";
+import { EventRegister } from "react-native-event-listeners";
 import User from "realmModels/User";
 import { useCurrentUser, useTranslation } from "sharedHooks";
 
 import CustomTabBar from "./CustomTabBar";
+import { TAB_PRESSED } from "./events";
 
 interface TabConfig {
   icon: string;
@@ -81,8 +83,18 @@ const CustomTabBarContainer: React.FC<Props> = ( { navigation, state } ) => {
       }
     }
 
-    // If pressing the currently active tab, reset its stack
+    // If pressing the currently active tab, scroll its root list to the top.
+    // When the user is deeper in the stack, keep the existing behavior of
+    // resetting back to the tab's root screen.
     if ( targetTabName === activeTabName ) {
+      const currentTabRoute = navState.routes.find( r => r.name === targetTabName );
+      const nestedState = currentTabRoute?.state;
+      const isAtRoot = ( nestedState?.index ?? 0 ) === 0;
+      if ( isAtRoot ) {
+        EventRegister.emit( TAB_PRESSED, targetTabName );
+        return;
+      }
+
       const idx = newStacks.findIndex( r => r.name === targetTabName );
       newStacks.splice( idx, 1, {
         name: targetTabName,
