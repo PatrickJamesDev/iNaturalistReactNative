@@ -9,12 +9,14 @@
  * Uses requestIdleCallback to schedule each task in its own callback so the
  * runtime can interleave user interactions between them.
  */
+import { fetchUserMe } from "api/users";
 import { cleanupLogFiles } from "components/Developer/logManagementHelpers";
-import { isLoggedIn } from "components/LoginSignUp/AuthenticationService";
+import { getJWT, isLoggedIn } from "components/LoginSignUp/AuthenticationService";
 import { navigationRef } from "navigation/navigationUtils";
 import { RealmContext } from "providers/contexts";
 import { useEffect } from "react";
 import User from "realmModels/User";
+import { syncLanguageFromRemoteUser } from "sharedHelpers/changeLanguage";
 import {
   clearComputerVisionPhotos,
   clearGalleryPhotos,
@@ -129,6 +131,15 @@ const useDeferredStartup = ( ) => {
         maxAgeMs: JOINED_PROJECTS_SYNC_MAX_AGE_MS,
       } );
     }, 30000 );
+    const id12 = deferTask( "syncRemoteLocale", async () => {
+      const currentUser = User.currentUser( realm );
+      if ( !currentUser ) {
+        return;
+      }
+      const apiToken = await getJWT( );
+      const remoteUser = await fetchUserMe( { }, { api_token: apiToken } );
+      syncLanguageFromRemoteUser( remoteUser, realm );
+    }, 30000 );
 
     return ( ) => {
       cancelIdleCallback( id0 );
@@ -143,6 +154,7 @@ const useDeferredStartup = ( ) => {
       cancelIdleCallback( id9 );
       cancelIdleCallback( id10 );
       cancelIdleCallback( id11 );
+      cancelIdleCallback( id12 );
     };
   }, [i18n, realm] );
 };
