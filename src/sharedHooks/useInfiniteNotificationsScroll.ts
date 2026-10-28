@@ -127,13 +127,25 @@ const useInfiniteNotificationsScroll = (
       },
     );
 
-    queryClient.setQueriesData<number>(
-      { predicate: query => query.queryKey.includes( "notificationsCount" ) },
-      oldCount => ( typeof oldCount === "number"
+    const decrementUnreadCount = ( oldCount: number | undefined ) => (
+      typeof oldCount === "number"
         ? Math.max( 0, oldCount - 1 )
-        : oldCount ),
+        : oldCount
     );
-  }, [queryClient] );
+    // Bottom tab badge
+    queryClient.setQueriesData<number>(
+      { queryKey: ["notificationsCount"] },
+      decrementUnreadCount,
+    );
+    // Badge on the currently visible notifications tab only
+    const tabId = notificationParams.observations_by === "owner"
+      ? "owner"
+      : "other";
+    queryClient.setQueriesData<number>(
+      { queryKey: ["NotificationsTab", "notificationsCount", tabId] },
+      decrementUnreadCount,
+    );
+  }, [notificationParams.observations_by, queryClient] );
 
   const {
     data,
