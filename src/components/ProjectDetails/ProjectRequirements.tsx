@@ -111,7 +111,7 @@ const ProjectRequirements = ( ) => {
     },
   ];
 
-  const projectQueryKey = ["projectRequirements", "fetchProjects", id];
+  const projectQueryKey = ["projectRequirements", "fetchProjects", id, i18n.language];
 
   // Overall Project Requirements
   const { data: project, isLoading } = useAuthenticatedQuery<Project>(
@@ -119,6 +119,7 @@ const ProjectRequirements = ( ) => {
     optsWithAuth => fetchProjects( id, {
       rule_details: true,
       fields: PROJECT_FIELDS_ALL,
+      locale: i18n.language,
       ttl: -1,
     }, optsWithAuth ),
   );

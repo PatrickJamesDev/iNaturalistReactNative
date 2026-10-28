@@ -29,6 +29,7 @@ const ProjectRuleItem = ( { rule }: Props ) => {
 
   const showTaxonName = taxon => (
     <DisplayTaxonName
+      layout="horizontal"
       prefersCommonNames={currentUser?.prefers_common_names}
       removeStyling
       scientificNameFirst={currentUser?.prefers_scientific_name_first}
