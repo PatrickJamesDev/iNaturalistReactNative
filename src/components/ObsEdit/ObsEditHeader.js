@@ -82,11 +82,13 @@ const ObsEditHeader = ( {
     }
     return (
       <Heading2
+        className="flex-1 mx-2"
         maxFontSizeMultiplier={1}
         testID="new-observation-text"
         accessible
         accessibilityRole="header"
         ellipsizeMode="tail"
+        numberOfLines={1}
       >
         {headingText}
       </Heading2>
@@ -213,10 +215,10 @@ const ObsEditHeader = ( {
   ] );
 
   return (
-    <View className="flex-row justify-between items-center bg-white">
+    <View className="flex-row items-center bg-white">
       {renderBackButton( )}
       {observations.length > 0 && renderHeaderTitle( )}
-      <View className="mr-4">
+      <View className="mr-4 shrink-0">
         {observations.length > 0 && renderKebabMenu( )}
       </View>
       {deleteSheetVisible && (
