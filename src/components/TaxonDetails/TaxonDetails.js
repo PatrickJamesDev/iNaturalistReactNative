@@ -89,6 +89,7 @@ const TaxonDetails = ( ): Node => {
   const getCurrentObservation = useStore( state => state.getCurrentObservation );
   const cameraRollUris = useStore( state => state.cameraRollUris );
   const resetMyObsOffsetToRestore = useStore( state => state.resetMyObsOffsetToRestore );
+  const isMultiObservationFlow = useStore( state => state.observations.length > 1 );
 
   // Hooks
   const navigation = useNavigation( );
@@ -253,9 +254,15 @@ const TaxonDetails = ( ): Node => {
 
   const saveForLater = useCallback( async ( ) => {
     await saveObservationFromSheet( );
+    if ( isMultiObservationFlow ) {
+      navigation.dispatch( StackActions.popTo( "ObsEdit" ) );
+      return;
+    }
     exitObservationFlow( );
   }, [
     exitObservationFlow,
+    isMultiObservationFlow,
+    navigation,
     saveObservationFromSheet,
   ] );
 
